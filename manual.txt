@@ -1,0 +1,91 @@
+================================================================================
+                        EVENTFORGE CLI v2.0
+               Made by VRJ • GitHub: jadhavidhi06-sketch
+                        LinkedIn: vidhi-jadhav
+================================================================================
+
+================================================================================
+                        EVENTFORGE CLI - USER MANUAL
+================================================================================
+
+NAME
+    eventforge.py - Discover coding, hackathon, developer and CTF events in India
+
+SYNOPSIS
+    python eventforge.py
+
+DESCRIPTION
+    EventForge is a powerful command-line tool that scrapes live events from
+    Devfolio, Unstop, and CTFtime, ranks them using AI heuristics, and displays
+    them in a beautiful terminal interface.
+
+FEATURES
+    • Live scraping from three major platforms
+    • AI-based event ranking (date, participants, location, prestige)
+    • Support for single and multi-state selection
+    • Shows only ongoing and upcoming events
+    • Full event links for direct registration
+    • Export results to JSON file
+    • No API keys required
+
+STEP-BY-STEP USAGE
+
+1. Event Category Selection
+   -----------------------
+   1. Coding Event
+   2. Developer Event
+   3. Hackathon Event
+   4. CTF Event
+   5. All Events
+
+2. State Selection Mode
+   --------------------
+   • Multi-state selection (recommended)
+   • Single state selection
+
+3. State Selection
+   ---------------
+   You will see a numbered list of all Indian states and union territories.
+   - For multi: Enter numbers separated by commas (e.g., 14,22,27) or type "all"
+   - For single: Enter one number
+
+4. Live Scraping
+   -------------
+   The tool will show a progress spinner while fetching live data.
+
+5. Results Display
+   ---------------
+   Events are shown in a ranked table with:
+   - Rank (based on AI score)
+   - Title
+   - Dates
+   - Location
+   - Source (Devfolio/Unstop/CTFtime)
+   - Direct Link
+   - AI Score
+
+6. Save Option
+   -----------
+   You will be asked if you want to save all results to a JSON file.
+   Filename format: eventforge_<type>_<date>_<time>.json
+
+TIPS & BEST PRACTICES
+
+• Always choose "All Events" first time to see everything available.
+• Use multi-state selection if you are open to travel.
+• Online events are automatically included regardless of state.
+• Copy the link from the table and open it in your browser to register.
+• Run the tool frequently as new events are added daily.
+
+TROUBLESHOOTING
+
+• "Playwright not installed" → Run: playwright install chromium
+• Slow first run → Normal, Chromium is being downloaded
+• Scraping warnings → Normal, some sites change layout frequently
+• No events found → Try "All Events" + "all" states
+
+SUPPORT
+    This is an open-source tool. Feel free to improve the scrapers when sites change.
+
+Last Updated: April 2026
+================================================================================
