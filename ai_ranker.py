@@ -1,29 +1,23 @@
 def rank_events(events):
-    ranked = []
-
     for e in events:
         score = 0
 
-        # Heuristics (AI-like ranking)
-        if "hackathon" in e["type"]:
+        name = e["name"].lower()
+
+        if "ctf" in name:
+            score += 50
+        if "hackathon" in name:
+            score += 40
+        if "ai" in name:
+            score += 25
+        if "cyber" in name:
             score += 30
 
-        if "ctf" in e["name"].lower():
+        if e["platform"] == "CTFtime":
             score += 40
-
-        if "ai" in e["name"].lower():
-            score += 20
-
-        if "web3" in e["name"].lower():
-            score += 15
-
         if e["platform"] == "Devfolio":
-            score += 25
-
-        if e["platform"] == "Unstop":
-            score += 20
+            score += 30
 
         e["score"] = score
-        ranked.append(e)
 
-    return sorted(ranked, key=lambda x: x["score"], reverse=True)
+    return sorted(events, key=lambda x: x["score"], reverse=True)

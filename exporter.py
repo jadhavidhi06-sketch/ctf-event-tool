@@ -5,12 +5,10 @@ def export_json(data):
     with open("events.json", "w") as f:
         json.dump(data, f, indent=4)
 
-
 def export_csv(data):
     with open("events.csv", "w", newline="") as f:
         writer = csv.writer(f)
-
-        writer.writerow(["Name", "Platform", "Location", "Date", "Score"])
+        writer.writerow(["Name", "Platform", "Location", "Date", "Score", "Link"])
 
         for e in data:
             writer.writerow([
@@ -18,5 +16,6 @@ def export_csv(data):
                 e["platform"],
                 e["location"],
                 e["date"],
-                e["score"]
+                e["score"],
+                e.get("link", "")
             ])

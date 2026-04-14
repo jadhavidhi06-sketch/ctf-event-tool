@@ -1,7 +1,9 @@
+import asyncio
 from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
-from scraper import scrape_events
+
+from async_scraper import scrape_all
 from ai_ranker import rank_events
 from exporter import export_json, export_csv
 from utils import multi_select_states
@@ -17,13 +19,14 @@ EVENT_TYPES = {
 }
 
 def display_events(events):
-    table = Table(title="🔥 Live Events")
+    table = Table(title="🔥 Elite Event Intelligence Feed")
 
     table.add_column("Name", style="cyan")
     table.add_column("Platform", style="magenta")
     table.add_column("Location", style="green")
     table.add_column("Date", style="yellow")
     table.add_column("Score", style="red")
+    table.add_column("Link", style="blue")
 
     for e in events:
         table.add_row(
@@ -31,14 +34,14 @@ def display_events(events):
             e["platform"],
             e["location"],
             e["date"],
-            str(e["score"])
+            str(e["score"]),
+            e.get("link", "N/A")
         )
 
     console.print(table)
 
-
-def main():
-    console.print("\n🚀 [bold cyan]CTF & Hackathon Finder Tool[/bold cyan]\n")
+async def main():
+    console.print("\n🚀 [bold cyan]CTF / Hackathon OSINT Tool[/bold cyan]\n")
 
     console.print("""
 1. Coding Events
@@ -53,20 +56,18 @@ def main():
 
     states = multi_select_states()
 
-    console.print("\n🔎 Fetching live events...\n")
+    console.print("\n⚡ Gathering intelligence (async scraping)...\n")
 
-    events = scrape_events(event_type, states)
+    events = await scrape_all(event_type, states)
 
     ranked = rank_events(events)
 
     display_events(ranked)
 
-    save = Prompt.ask("\n💾 Save results? (y/n)", default="y")
-
-    if save.lower() == "y":
+    if Prompt.ask("\n💾 Save results? (y/n)", default="y") == "y":
         export_json(ranked)
         export_csv(ranked)
-        console.print("✅ Saved as JSON & CSV")
+        console.print("✅ Saved successfully")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
