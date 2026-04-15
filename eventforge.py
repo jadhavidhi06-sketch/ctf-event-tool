@@ -2,7 +2,7 @@ import asyncio
 import json
 import re
 from datetime import datetime, timezone, timedelta
-from typing import List
+from typing import List, Optional
 
 import httpx
 from playwright.async_api import async_playwright, TimeoutError
@@ -42,7 +42,8 @@ class Event:
         self.end = end
         self.location = (location.strip() or "🌐 Online / Remote").replace("Online", "🌐 Online").replace("Offline", "📍 Offline")
         self.link = link
-        self.description = (description or "No description available")[:280] + "..."
+        clean_desc = (description or "No description available").strip()
+        self.description = clean_desc[:280] + ("..." if len(clean_desc) > 280 else "")
         self.source = source
         self.participants = participants
         self.event_type = event_type
@@ -96,18 +97,54 @@ def ai_rank_events(events: List[Event]) -> List[Event]:
 # ==================== DATE PARSER ====================
 def parse_date(date_text: str) -> datetime:
     try:
-        match = re.search(r'(\d{1,2})/(\d{1,2})/(\d{2})', date_text)
+        text = (date_text or "").strip()
+        match = re.search(r'(\d{1,2})/(\d{1,2})/(\d{2})(?!\d)', text)
         if match:
             day, month, year = match.groups()
             return datetime(2000 + int(year), int(month), int(day), tzinfo=timezone.utc)
-        for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%d %b %Y", "%b %d %Y", "%Y-%m-%d"):
-            try:
-                return datetime.strptime(date_text.strip()[:10], fmt).replace(tzinfo=timezone.utc)
-            except:
-                continue
-    except:
+
+        candidates = re.findall(
+            r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b|\b[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4}\b|\b\d{4}-\d{2}-\d{2}\b",
+            text
+        )
+        for candidate in candidates + [text]:
+            for fmt in ("%d/%m/%Y", "%d/%m/%y", "%d-%m-%Y", "%d-%m-%y", "%d %b %Y", "%d %B %Y", "%b %d %Y", "%B %d %Y", "%Y-%m-%d"):
+                try:
+                    sanitized = candidate.replace(",", "").strip()
+                    return datetime.strptime(sanitized, fmt).replace(tzinfo=timezone.utc)
+                except ValueError:
+                    continue
+    except Exception:
         pass
     return datetime.now(timezone.utc) + timedelta(days=5)
+
+
+async def _first_text(node, selectors: List[str]) -> Optional[str]:
+    for selector in selectors:
+        try:
+            el = await node.query_selector(selector)
+            if not el:
+                continue
+            txt = (await el.inner_text() or "").strip()
+            if txt:
+                return txt
+        except Exception:
+            continue
+    return None
+
+
+async def _first_attr(node, selectors: List[str], attr: str) -> Optional[str]:
+    for selector in selectors:
+        try:
+            el = await node.query_selector(selector)
+            if not el:
+                continue
+            val = await el.get_attribute(attr)
+            if val and val.strip():
+                return val.strip()
+        except Exception:
+            continue
+    return None
 
 
 # ==================== CTFTIME (ALREADY PERFECT) ====================
@@ -166,22 +203,23 @@ async def scrape_devfolio() -> List[Event]:
             
             for card in cards[:50]:
                 try:
-                    title = await card.query_selector_inner_text("h3, h4, .title, strong") or "Devfolio Hackathon"
+                    title = await _first_text(card, ["h3", "h4", ".title", "strong"]) or "Devfolio Hackathon"
                     if len(title.strip()) < 5:
                         continue
 
-                    link = await card.query_selector_attribute('a:has-text("Apply now"), a[href*="/hackathons/"]', "href")
+                    link = await _first_attr(card, ['a:has-text("Apply now")', 'a[href*="/hackathons/"]', "a"], "href")
                     if not link:
                         link = await card.get_attribute("href")
                     if link and not link.startswith("http"):
                         link = "https://devfolio.co" + link
+                    link = link or "https://devfolio.co/hackathons"
 
-                    date_text = await card.query_selector_inner_text('text=Starts, text=Start, text=Date') or await card.inner_text()
+                    date_text = await _first_text(card, ['text=/Starts|Start|Date/i']) or await card.inner_text()
                     start = parse_date(date_text)
                     end = start + timedelta(days=3)
 
-                    location_text = await card.query_selector_inner_text('text=Online, text=Offline, text=Hybrid') or "🌐 Online"
-                    part_text = await card.query_selector_inner_text('text=+, text=participants') or "800"
+                    location_text = await _first_text(card, ['text=/Online|Offline|Hybrid/i']) or "🌐 Online"
+                    part_text = await _first_text(card, ['text=/participants?/i']) or "800"
                     participants = int(re.search(r'\d+', part_text).group(0)) if re.search(r'\d+', part_text) else 800
 
                     ev = Event(
@@ -230,15 +268,16 @@ async def scrape_unstop() -> List[Event]:
 
             for card in cards[:50]:
                 try:
-                    title = await card.query_selector_inner_text("h3, .title, .event-title, .name") or "Unstop Event"
+                    title = await _first_text(card, ["h3", ".title", ".event-title", ".name"]) or "Unstop Event"
                     if len(title.strip()) < 5:
                         continue
 
-                    link = await card.query_selector_attribute("a", "href")
+                    link = await _first_attr(card, ["a"], "href")
                     if link and not link.startswith("http"):
                         link = "https://unstop.com" + link
+                    link = link or "https://unstop.com/hackathons"
 
-                    location_text = await card.query_selector_inner_text('.location, .city, .venue, .mode, text=Online, text=Offline') or "🌐 Online"
+                    location_text = await _first_text(card, ['.location', '.city', '.venue', '.mode', 'text=/Online|Offline|Hybrid/i']) or "🌐 Online"
 
                     date_text = await card.inner_text()
                     start = parse_date(date_text)
@@ -277,7 +316,7 @@ async def scrape_all(event_type: str) -> List[Event]:
         task = progress.add_task("fetching", total=1)
 
         tasks = []
-        if event_type in ["coding", "developer", "hackaton", "all"]:
+        if event_type in ["coding", "developer", "hackathon", "hackaton", "all"]:
             tasks.extend([scrape_devfolio(), scrape_unstop()])
         if event_type in ["ctf", "all"]:
             tasks.append(scrape_ctftime())
@@ -294,7 +333,7 @@ async def scrape_all(event_type: str) -> List[Event]:
     seen = {}
     unique = []
     for e in all_events:
-        key = e.title.lower().strip()
+        key = f"{e.title.lower().strip()}|{e.source}|{e.start.date().isoformat()}"
         if key not in seen:
             seen[key] = True
             unique.append(e)
@@ -340,7 +379,7 @@ async def main():
     console.print("\n[bold]Choose event category:[/bold]")
     console.print("1. Coding Event\n2. Developer Event\n3. Hackathon Event\n4. CTF Event\n5. All Events")
     choice = Prompt.ask("Enter option", choices=["1","2","3","4","5"], default="5")
-    type_map = {"1": "coding", "2": "developer", "3": "hackaton", "4": "ctf", "5": "all"}
+    type_map = {"1": "coding", "2": "developer", "3": "hackathon", "4": "ctf", "5": "all"}
     event_type = type_map[choice]
 
     multi = Confirm.ask("Multi-state selection? (Online + Offline both supported)", default=True)
