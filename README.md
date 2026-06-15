@@ -32,9 +32,6 @@ Live scraping from **Devfolio + Unstop + CTFtime** with beautiful Rich UI, AI-po
 
 ---
 
-## 📸 Preview
-
-```bash
 🚀 EventForge CLI
 Live Scraping • Devfolio + Unstop + CTFtime • AI Ranking
 
