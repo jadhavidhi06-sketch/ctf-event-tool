@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-CTFForge Pro v4.0 - Advanced CTF Discovery & Intelligence Engine
+CTFForge Pro v4.1 - Advanced CTF Discovery & Intelligence Engine
 Author: VRJ
 GitHub: jadhavidhi06-sketch
 LinkedIn: vidhi-jadhav
 
-Professional CTF Event Aggregator with Multi-Source Intelligence,
-Advanced AI Ranking, Real-time Monitoring, and Comprehensive Analytics
+Fixed Version - Reliable scraping with proper fallbacks
 """
 
 import asyncio
@@ -23,7 +22,6 @@ from enum import Enum
 from collections import defaultdict
 
 import httpx
-from playwright.async_api import async_playwright
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -39,13 +37,12 @@ from rich.markdown import Markdown
 from rich.tree import Tree
 from rich.align import Align
 
-# ==================== CONFIGURATION ====================
 console = Console()
 
 __author__ = "VRJ"
 __github__ = "jadhavidhi06-sketch"
 __linkedin__ = "vidhi-jadhav"
-__version__ = "4.0"
+__version__ = "4.1"
 __tool_name__ = "CTFForge Pro"
 
 # ==================== ENUMS ====================
@@ -73,18 +70,13 @@ class EventStatus(Enum):
 @dataclass
 class CTFEvent:
     """Comprehensive CTF Event Data Model"""
-    # Core Identification
     id: str = ""
     title: str = ""
     subtitle: str = ""
-    
-    # Timing
     start_date: datetime = None
     end_date: datetime = None
     registration_deadline: Optional[datetime] = None
     duration_hours: float = 0.0
-    
-    # Location & Format
     location: str = "🌐 Online"
     country: str = "Global"
     state: str = ""
@@ -94,33 +86,23 @@ class CTFEvent:
     is_hybrid: bool = False
     format_type: CTFFormat = CTFFormat.JEOPARDY
     difficulty: DifficultyLevel = DifficultyLevel.INTERMEDIATE
-    
-    # Source Information
     source: str = ""
     source_url: str = ""
     source_id: str = ""
-    
-    # Links
     registration_url: str = ""
     website_url: str = ""
     discord_url: Optional[str] = None
     twitter_url: Optional[str] = None
     writeup_url: Optional[str] = None
-    
-    # Organizer Details
     organizer_name: str = "Unknown"
     organizer_url: Optional[str] = None
     organizer_email: Optional[str] = None
     organizer_logo: Optional[str] = None
-    
-    # Statistics
     participants_count: int = 0
     max_participants: Optional[int] = None
     team_size_min: int = 1
     team_size_max: int = 10
     registered_teams: int = 0
-    
-    # Prizes & Rewards
     prize_pool_total: float = 0.0
     prize_currency: str = "USD"
     first_place_prize: float = 0.0
@@ -129,41 +111,30 @@ class CTFEvent:
     has_swag: bool = False
     has_certificates: bool = False
     has_travel_aid: bool = False
-    
-    # CTF Specifications
     weight: float = 0.0
     rating: float = 0.0
     category: str = "General"
     tags: List[str] = field(default_factory=list)
     challenges_count: int = 0
     categories_available: List[str] = field(default_factory=list)
-    
-    # Description & Content
     description: str = ""
     short_description: str = ""
     requirements: str = ""
     rules: str = ""
     schedule: Dict[str, str] = field(default_factory=dict)
-    
-    # Social & Community
     twitter_hashtag: Optional[str] = None
     discord_invite: Optional[str] = None
     telegram_group: Optional[str] = None
     ctftime_url: Optional[str] = None
-    
-    # Metadata
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     last_scraped: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     data_quality_score: float = 0.0
-    
-    # AI Scoring
     ai_score: float = 0.0
     ai_confidence: float = 0.0
     ai_factors: Dict[str, float] = field(default_factory=dict)
     
     def to_dict(self) -> Dict:
-        """Convert to dictionary for export"""
         result = {}
         for key, value in asdict(self).items():
             if isinstance(value, datetime):
@@ -177,14 +148,12 @@ class CTFEvent:
         return result
     
     def calculate_duration(self) -> float:
-        """Calculate event duration in hours"""
         if self.start_date and self.end_date:
             delta = self.end_date - self.start_date
             self.duration_hours = delta.total_seconds() / 3600
         return self.duration_hours
     
     def get_status(self) -> EventStatus:
-        """Determine current event status"""
         now = datetime.now(timezone.utc)
         if not self.start_date:
             return EventStatus.UPCOMING
@@ -196,7 +165,6 @@ class CTFEvent:
 
 @dataclass
 class CTFAnalytics:
-    """Analytics and statistics for CTF events"""
     total_events: int = 0
     online_events: int = 0
     offline_events: int = 0
@@ -213,44 +181,44 @@ class CTFAnalytics:
     top_organizers: List[Tuple[str, int]] = field(default_factory=list)
     top_tags: List[Tuple[str, int]] = field(default_factory=list)
 
-# ==================== INDIAN STATES DATABASE ====================
+# ==================== INDIAN STATES DATABASE (COMPLETE) ====================
 INDIAN_STATES = {
-    "Andhra Pradesh": {"capital": "Amaravati", "region": "South", "timezone": "IST"},
-    "Arunachal Pradesh": {"capital": "Itanagar", "region": "Northeast", "timezone": "IST"},
-    "Assam": {"capital": "Dispur", "region": "Northeast", "timezone": "IST"},
-    "Bihar": {"capital": "Patna", "region": "East", "timezone": "IST"},
-    "Chhattisgarh": {"capital": "Raipur", "region": "Central", "timezone": "IST"},
-    "Goa": {"capital": "Panaji", "region": "West", "timezone": "IST"},
-    "Gujarat": {"capital": "Gandhinagar", "region": "West", "timezone": "IST"},
-    "Haryana": {"capital": "Chandigarh", "region": "North", "timezone": "IST"},
-    "Himachal Pradesh": {"capital": "Shimla", "region": "North", "timezone": "IST"},
-    "Jharkhand": {"capital": "Ranchi", "region": "East", "timezone": "IST"},
-    "Karnataka": {"capital": "Bengaluru", "region": "South", "timezone": "IST"},
-    "Kerala": {"capital": "Thiruvananthapuram", "region": "South", "timezone": "IST"},
-    "Madhya Pradesh": {"capital": "Bhopal", "region": "Central", "timezone": "IST"},
-    "Maharashtra": {"capital": "Mumbai", "region": "West", "timezone": "IST"},
-    "Manipur": {"capital": "Imphal", "region": "Northeast", "timezone": "IST"},
-    "Meghalaya": {"capital": "Shillong", "region": "Northeast", "timezone": "IST"},
-    "Mizoram": {"capital": "Aizawl", "region": "Northeast", "timezone": "IST"},
-    "Nagaland": {"capital": "Kohima", "region": "Northeast", "timezone": "IST"},
-    "Odisha": {"capital": "Bhubaneswar", "region": "East", "timezone": "IST"},
-    "Punjab": {"capital": "Chandigarh", "region": "North", "timezone": "IST"},
-    "Rajasthan": {"capital": "Jaipur", "region": "North", "timezone": "IST"},
-    "Sikkim": {"capital": "Gangtok", "region": "Northeast", "timezone": "IST"},
-    "Tamil Nadu": {"capital": "Chennai", "region": "South", "timezone": "IST"},
-    "Telangana": {"capital": "Hyderabad", "region": "South", "timezone": "IST"},
-    "Tripura": {"capital": "Agartala", "region": "Northeast", "timezone": "IST"},
-    "Uttar Pradesh": {"capital": "Lucknow", "region": "North", "timezone": "IST"},
-    "Uttarakhand": {"capital": "Dehradun", "region": "North", "timezone": "IST"},
-    "West Bengal": {"capital": "Kolkata", "region": "East", "timezone": "IST"},
-    "Delhi": {"capital": "New Delhi", "region": "North", "timezone": "IST"},
-    "Jammu and Kashmir": {"capital": "Srinagar", "region": "North", "timezone": "IST"},
-    "Ladakh": {"capital": "Leh", "region": "North", "timezone": "IST"},
-    "Puducherry": {"capital": "Puducherry", "region": "South", "timezone": "IST"},
-    "Chandigarh": {"capital": "Chandigarh", "region": "North", "timezone": "IST"},
-    "Andaman and Nicobar Islands": {"capital": "Port Blair", "region": "Islands", "timezone": "IST"},
-    "Dadra and Nagar Haveli and Daman and Diu": {"capital": "Daman", "region": "West", "timezone": "IST"},
-    "Lakshadweep": {"capital": "Kavaratti", "region": "Islands", "timezone": "IST"}
+    1: "Andhra Pradesh",
+    2: "Arunachal Pradesh",
+    3: "Assam",
+    4: "Bihar",
+    5: "Chhattisgarh",
+    6: "Goa",
+    7: "Gujarat",
+    8: "Haryana",
+    9: "Himachal Pradesh",
+    10: "Jharkhand",
+    11: "Karnataka",
+    12: "Kerala",
+    13: "Madhya Pradesh",
+    14: "Maharashtra",
+    15: "Manipur",
+    16: "Meghalaya",
+    17: "Mizoram",
+    18: "Nagaland",
+    19: "Odisha",
+    20: "Punjab",
+    21: "Rajasthan",
+    22: "Sikkim",
+    23: "Tamil Nadu",
+    24: "Telangana",
+    25: "Tripura",
+    26: "Uttar Pradesh",
+    27: "Uttarakhand",
+    28: "West Bengal",
+    29: "Andaman and Nicobar Islands",
+    30: "Chandigarh",
+    31: "Dadra and Nagar Haveli and Daman and Diu",
+    32: "Delhi",
+    33: "Jammu and Kashmir",
+    34: "Ladakh",
+    35: "Lakshadweep",
+    36: "Puducherry"
 }
 
 # ==================== CTF CATEGORIES ====================
@@ -279,7 +247,6 @@ class AIRankingEngine:
         }
         
     def calculate_timeliness_score(self, event: CTFEvent) -> float:
-        """Score based on how soon the event starts"""
         now = datetime.now(timezone.utc)
         if not event.start_date:
             return 0.0
@@ -288,48 +255,36 @@ class AIRankingEngine:
         
         if days_to_start < 0:  # Ongoing
             return 100.0
-        elif days_to_start <= 7:  # Within a week
+        elif days_to_start <= 7:
             return 90.0 - (days_to_start * 5)
-        elif days_to_start <= 30:  # Within a month
+        elif days_to_start <= 30:
             return 60.0 - (days_to_start * 1.5)
-        elif days_to_start <= 90:  # Within 3 months
+        elif days_to_start <= 90:
             return 30.0 - (days_to_start * 0.3)
         else:
             return max(5.0, 20.0 - (days_to_start * 0.1))
     
     def calculate_popularity_score(self, event: CTFEvent) -> float:
-        """Score based on participant count and engagement"""
         score = 0.0
-        
-        # Participant count
         if event.participants_count > 0:
             participant_score = min(100, event.participants_count / 10)
             score += participant_score * 0.6
-        
-        # Team registration
         if event.registered_teams > 0:
             team_score = min(100, event.registered_teams / 5)
             score += team_score * 0.4
-        
         return min(100, score)
     
     def calculate_prestige_score(self, event: CTFEvent) -> float:
-        """Score based on CTF weight and reputation"""
         score = 0.0
-        
-        # CTFtime weight
         if event.weight > 0:
             weight_score = min(100, event.weight * 1.2)
             score += weight_score * 0.5
-        
-        # Rating
         if event.rating > 0:
             rating_score = min(100, event.rating * 20)
             score += rating_score * 0.3
         
-        # Historical prestige keywords
         prestige_keywords = ['def con', 'google ctf', 'hackthebox', 'tryhackme', 
-                           'picoctf', 'csaw', 'asis', 'hxp', 'dragonctf']
+                           'picoctf', 'csaw', 'asis', 'hxp', 'dragonctf', 'nullcon']
         title_lower = event.title.lower()
         for keyword in prestige_keywords:
             if keyword in title_lower:
@@ -338,56 +293,38 @@ class AIRankingEngine:
         return min(100, score)
     
     def calculate_accessibility_score(self, event: CTFEvent) -> float:
-        """Score based on how accessible the event is"""
-        score = 50.0  # Base score
-        
-        # Online events are more accessible
+        score = 50.0
         if event.is_online:
             score += 30
-        
-        # Free events
         if event.prize_pool_total == 0:
             score += 10
-        
-        # Team size flexibility
         if event.team_size_min <= 1:
             score += 5
-        
-        # Beginner friendly
         if event.difficulty == DifficultyLevel.BEGINNER:
             score += 10
         elif event.difficulty == DifficultyLevel.INTERMEDIATE:
             score += 5
-        
-        # Multiple categories
         if len(event.categories_available) >= 5:
             score += 5
-        
         return min(100, score)
     
     def calculate_rewards_score(self, event: CTFEvent) -> float:
-        """Score based on prizes and rewards"""
         if event.prize_pool_total <= 0:
             return 0.0
-        
         score = min(100, event.prize_pool_total / 100) * 0.6
-        
         if event.has_swag:
             score += 15
         if event.has_certificates:
             score += 15
         if event.has_travel_aid:
             score += 10
-        
         return min(100, score)
     
     def calculate_quality_score(self, event: CTFEvent) -> float:
-        """Score based on data completeness and event quality"""
         score = 0.0
         fields_checked = 0
         fields_filled = 0
         
-        # Check various fields
         checks = [
             (event.description, 10),
             (event.organizer_name != "Unknown", 10),
@@ -410,33 +347,25 @@ class AIRankingEngine:
         return score
     
     def calculate_local_relevance_score(self, event: CTFEvent, selected_states: List[str]) -> float:
-        """Score based on relevance to selected Indian states"""
         if not selected_states:
-            return 50.0  # Neutral if no states selected
+            return 50.0
         
         score = 0.0
-        
-        # Check if event is in any selected state
         for state in selected_states:
             if state.lower() in event.location.lower() or state.lower() in event.state.lower():
                 score += 40
         
-        # Check if event is in India
         if event.country.lower() == "india":
             score += 20
-        
-        # Online events are always relevant
         if event.is_online:
             score += 15
         
         return min(100, score)
     
     def calculate_confidence_score(self, event: CTFEvent) -> float:
-        """Calculate confidence in the AI score"""
         confidence = 0.0
         factors = 0
         
-        # More data = higher confidence
         if event.participants_count > 0:
             confidence += 15
             factors += 1
@@ -462,11 +391,9 @@ class AIRankingEngine:
             confidence += 10
             factors += 1
         
-        # Normalize
         return min(100, confidence)
     
     def rank_event(self, event: CTFEvent, selected_states: List[str] = None) -> CTFEvent:
-        """Apply AI ranking to a single event"""
         scores = {
             'timeliness': self.calculate_timeliness_score(event),
             'popularity': self.calculate_popularity_score(event),
@@ -477,13 +404,9 @@ class AIRankingEngine:
             'local_relevance': self.calculate_local_relevance_score(event, selected_states or [])
         }
         
-        # Calculate weighted score
         total_score = sum(scores[k] * self.weights[k] for k in scores)
-        
-        # Calculate confidence
         confidence = self.calculate_confidence_score(event)
         
-        # Update event
         event.ai_score = round(total_score, 2)
         event.ai_confidence = round(confidence, 2)
         event.ai_factors = scores
@@ -491,136 +414,136 @@ class AIRankingEngine:
         return event
     
     def rank_events(self, events: List[CTFEvent], selected_states: List[str] = None) -> List[CTFEvent]:
-        """Rank multiple events"""
         ranked = [self.rank_event(event, selected_states) for event in events]
         return sorted(ranked, key=lambda x: x.ai_score, reverse=True)
 
-# ==================== CTF SCRAPERS ====================
+# ==================== CTF SCRAPERS (FIXED) ====================
 class BaseScraper:
-    """Base class for all CTF scrapers"""
-    
     def __init__(self):
         self.name = "Base"
-        self.timeout = 30
-        self.retry_count = 3
+        self.timeout = 60
     
     async def scrape(self) -> List[CTFEvent]:
-        """Main scrape method - override in subclasses"""
         raise NotImplementedError
-    
-    async def retry_scrape(self, coro, max_retries: int = 3) -> Any:
-        """Retry a scrape operation with exponential backoff"""
-        for attempt in range(max_retries):
-            try:
-                return await coro
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    raise
-                await asyncio.sleep(2 ** attempt)
 
 class CTFtimeAPIScraper(BaseScraper):
-    """Scraper for CTFtime API"""
+    """Scraper for CTFtime API - Primary Source"""
     
     def __init__(self):
         super().__init__()
         self.name = "CTFtime API"
-        self.base_url = "https://ctftime.org/api/v1"
     
     async def scrape(self) -> List[CTFEvent]:
         events = []
         try:
-            now_ts = int(datetime.now(timezone.utc).timestamp())
-            url = f"{self.base_url}/events/?limit=200&start={now_ts-86400}&finish={now_ts+180*86400}"
+            # Get current timestamp and future events
+            now = datetime.now(timezone.utc)
+            start_ts = int(now.timestamp()) - 86400  # 1 day ago
+            end_ts = int((now + timedelta(days=180)).timestamp())  # 6 months ahead
             
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            url = f"https://ctftime.org/api/v1/events/?limit=100&start={start_ts}&finish={end_ts}"
+            
+            async with httpx.AsyncClient(timeout=self.timeout, verify=False) as client:
                 response = await client.get(url, headers={
-                    "User-Agent": f"{__tool_name__}/{__version__}",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                     "Accept": "application/json"
                 })
-                data = response.json()
-            
-            for item in data:
-                try:
-                    event = CTFEvent()
-                    event.title = item.get("title", "Unknown CTF")
-                    event.source = "CTFtime"
-                    event.source_id = str(item.get("id", ""))
-                    event.ctftime_url = item.get("ctftime_url", "")
+                
+                if response.status_code == 200:
+                    data = response.json()
                     
-                    # Dates
-                    start_str = item.get("start", "")
-                    end_str = item.get("finish", "")
-                    if start_str:
-                        event.start_date = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
-                    if end_str:
-                        event.end_date = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
-                    
-                    # Location
-                    if item.get("onsite"):
-                        event.is_online = False
-                        event.is_offline = True
-                        event.location = f"📍 {item.get('location', 'TBD')}"
-                    else:
-                        event.is_online = True
-                        event.location = "🌐 Online"
-                    
-                    # Links
-                    event.website_url = item.get("url", "")
-                    event.registration_url = item.get("url", "") or event.ctftime_url
-                    
-                    # Description
-                    event.description = item.get("description", "")
-                    event.short_description = event.description[:200] if event.description else ""
-                    
-                    # Format
-                    format_str = item.get("format", "").lower()
-                    if "jeopardy" in format_str:
-                        event.format_type = CTFFormat.JEOPARDY
-                    elif "attack" in format_str or "defense" in format_str:
-                        event.format_type = CTFFormat.ATTACK_DEFENSE
-                    elif "mixed" in format_str:
-                        event.format_type = CTFFormat.MIXED
-                    else:
-                        event.format_type = CTFFormat.OTHER
-                    
-                    # Statistics
-                    event.participants_count = item.get("participants", 0)
-                    event.weight = float(item.get("weight", 0))
-                    
-                    # Prizes
-                    event.prize_pool_total = float(item.get("prizes_amount", 0))
-                    event.prize_currency = item.get("prizes_currency", "USD")
-                    
-                    # Organizer
-                    organizer = item.get("organizer", {})
-                    if organizer:
-                        event.organizer_name = organizer.get("name", "Unknown")
-                        event.organizer_url = organizer.get("url", "")
-                    
-                    # Tags
-                    tags = item.get("tags", [])
-                    if tags:
-                        event.tags = [tag.get("name", "") for tag in tags if tag.get("name")]
-                    
-                    # Categories
-                    categories = item.get("categories", [])
-                    if categories:
-                        event.categories_available = [cat.get("name", "") for cat in categories if cat.get("name")]
-                    
-                    # Duration
-                    event.calculate_duration()
-                    
-                    events.append(event)
-                except Exception as e:
-                    continue
-                    
+                    for item in data:
+                        try:
+                            event = CTFEvent()
+                            event.title = item.get("title", "Unknown CTF")
+                            event.source = "CTFtime"
+                            event.source_id = str(item.get("id", ""))
+                            event.ctftime_url = item.get("ctftime_url", "")
+                            
+                            # Dates
+                            start_str = item.get("start", "")
+                            end_str = item.get("finish", "")
+                            if start_str:
+                                event.start_date = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                            if end_str:
+                                event.end_date = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+                            
+                            # Location
+                            if item.get("onsite"):
+                                event.is_online = False
+                                event.is_offline = True
+                                loc = item.get("location", "TBD")
+                                event.location = f"📍 {loc}"
+                                
+                                # Check if in India
+                                if "india" in loc.lower():
+                                    event.country = "India"
+                                    for state_name in INDIAN_STATES.values():
+                                        if state_name.lower() in loc.lower():
+                                            event.state = state_name
+                                            break
+                            else:
+                                event.is_online = True
+                                event.location = "🌐 Online"
+                            
+                            # Links
+                            event.website_url = item.get("url", "")
+                            event.registration_url = item.get("url", "") or event.ctftime_url
+                            
+                            # Description
+                            event.description = item.get("description", "")
+                            event.short_description = event.description[:200] if event.description else ""
+                            
+                            # Format
+                            format_str = item.get("format", "").lower()
+                            if "jeopardy" in format_str:
+                                event.format_type = CTFFormat.JEOPARDY
+                            elif "attack" in format_str or "defense" in format_str:
+                                event.format_type = CTFFormat.ATTACK_DEFENSE
+                            elif "mixed" in format_str:
+                                event.format_type = CTFFormat.MIXED
+                            else:
+                                event.format_type = CTFFormat.OTHER
+                            
+                            # Statistics
+                            event.participants_count = item.get("participants", 0)
+                            event.weight = float(item.get("weight", 0))
+                            
+                            # Prizes
+                            event.prize_pool_total = float(item.get("prizes_amount", 0))
+                            event.prize_currency = item.get("prizes_currency", "USD")
+                            
+                            # Organizer
+                            organizer = item.get("organizer", {})
+                            if organizer:
+                                event.organizer_name = organizer.get("name", "Unknown")
+                                event.organizer_url = organizer.get("url", "")
+                            
+                            # Tags
+                            tags = item.get("tags", [])
+                            if tags:
+                                event.tags = [tag.get("name", "") for tag in tags if tag.get("name")]
+                            
+                            # Categories
+                            categories = item.get("categories", [])
+                            if categories:
+                                event.categories_available = [cat.get("name", "") for cat in categories if cat.get("name")]
+                            
+                            event.calculate_duration()
+                            
+                            if event.title and event.start_date:
+                                events.append(event)
+                                
+                        except Exception as e:
+                            continue
+                            
         except Exception as e:
-            console.print(f"[red]CTFtime API scrape failed: {e}[/red]")
+            console.print(f"[yellow]CTFtime API scrape warning: {str(e)[:100]}[/yellow]")
         
         return events
 
 class CTFtimeHTMLScraper(BaseScraper):
-    """Scraper for CTFtime website (detailed info)"""
+    """Scraper for CTFtime website using httpx (no Playwright)"""
     
     def __init__(self):
         super().__init__()
@@ -628,84 +551,78 @@ class CTFtimeHTMLScraper(BaseScraper):
     
     async def scrape(self) -> List[CTFEvent]:
         events = []
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            
-            try:
-                await page.goto("https://ctftime.org/event/list/upcoming", 
-                              timeout=self.timeout * 1000)
-                await page.wait_for_load_state("networkidle")
-                await page.wait_for_timeout(3000)
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout, verify=False, follow_redirects=True) as client:
+                response = await client.get(
+                    "https://ctftime.org/event/list/upcoming",
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Accept": "text/html,application/xhtml+xml"
+                    }
+                )
                 
-                # Get all event rows
-                rows = await page.query_selector_all('table tbody tr')
-                
-                for row in rows[:100]:  # Limit to 100 events
-                    try:
-                        event = CTFEvent()
-                        
-                        # Title and link
-                        title_el = await row.query_selector('td:nth-child(2) a')
-                        if title_el:
-                            event.title = (await title_el.inner_text()).strip()
-                            href = await title_el.get_attribute('href')
-                            if href:
-                                event.ctftime_url = f"https://ctftime.org{href}"
-                        
-                        # Date
-                        date_el = await row.query_selector('td:nth-child(1)')
-                        if date_el:
-                            date_text = await date_el.inner_text()
+                if response.status_code == 200:
+                    html = response.text
+                    
+                    # Parse events using regex
+                    event_pattern = r'<tr[^>]*>.*?<td[^>]*>.*?(\d{4}-\d{2}-\d{2}).*?</td>.*?<td[^>]*>.*?<a[^>]*href="(/event/\d+/)"[^>]*>(.*?)</a>.*?<td[^>]*>(.*?)</td>.*?<td[^>]*>(.*?)</td>.*?<td[^>]*>(.*?)</td>.*?<td[^>]*>(.*?)</td>.*?</tr>'
+                    
+                    matches = re.findall(event_pattern, html, re.DOTALL)
+                    
+                    for match in matches[:50]:
+                        try:
+                            event = CTFEvent()
+                            event.title = match[2].strip()
+                            event.ctftime_url = f"https://ctftime.org{match[1]}"
+                            event.source = "CTFtime"
+                            
                             # Parse date
-                            date_match = re.search(r'(\d{4}-\d{2}-\d{2})', date_text)
-                            if date_match:
-                                event.start_date = datetime.fromisoformat(date_match.group(1) + "T00:00:00+00:00")
-                        
-                        # Location
-                        loc_el = await row.query_selector('td:nth-child(4)')
-                        if loc_el:
-                            loc_text = await loc_el.inner_text()
-                            event.location = loc_text.strip()
+                            date_str = match[0].strip()
+                            event.start_date = datetime.fromisoformat(date_str + "T00:00:00+00:00")
+                            event.end_date = event.start_date + timedelta(days=2)
+                            
+                            # Location
+                            loc_text = match[3].strip()
                             if "online" in loc_text.lower():
                                 event.is_online = True
+                                event.location = "🌐 Online"
                             else:
                                 event.is_offline = True
-                        
-                        # Format
-                        format_el = await row.query_selector('td:nth-child(5)')
-                        if format_el:
-                            format_text = (await format_el.inner_text()).strip()
-                            if "jeopardy" in format_text.lower():
+                                event.location = f"📍 {loc_text}"
+                                if "india" in loc_text.lower():
+                                    event.country = "India"
+                            
+                            # Format
+                            format_text = match[4].strip().lower()
+                            if "jeopardy" in format_text:
                                 event.format_type = CTFFormat.JEOPARDY
-                            elif "attack" in format_text.lower():
+                            elif "attack" in format_text:
                                 event.format_type = CTFFormat.ATTACK_DEFENSE
-                        
-                        # Weight
-                        weight_el = await row.query_selector('td:nth-child(6)')
-                        if weight_el:
-                            weight_text = (await weight_el.inner_text()).strip()
+                            
+                            # Weight
+                            weight_text = match[5].strip()
                             weight_match = re.search(r'[\d.]+', weight_text)
                             if weight_match:
                                 event.weight = float(weight_match.group())
-                        
-                        # Set end date (default 2 days after start)
-                        if event.start_date:
-                            event.end_date = event.start_date + timedelta(days=2)
-                        
-                        event.source = "CTFtime"
-                        event.calculate_duration()
-                        
-                        if event.title:
-                            events.append(event)
                             
-                    except Exception:
-                        continue
-                        
-            except Exception as e:
-                console.print(f"[yellow]CTFtime HTML scrape warning: {e}[/yellow]")
-            finally:
-                await browser.close()
+                            # Participants
+                            parts_text = match[6].strip()
+                            parts_match = re.search(r'\d+', parts_text)
+                            if parts_match:
+                                event.participants_count = int(parts_match.group())
+                            
+                            event.website_url = event.ctftime_url
+                            event.registration_url = event.ctftime_url
+                            event.calculate_duration()
+                            
+                            if event.title:
+                                events.append(event)
+                                
+                        except Exception:
+                            continue
+                            
+        except Exception as e:
+            console.print(f"[yellow]CTFtime HTML scrape warning: {str(e)[:100]}[/yellow]")
         
         return events
 
@@ -715,301 +632,446 @@ class CTFHuntScraper(BaseScraper):
     def __init__(self):
         super().__init__()
         self.name = "CTF Hunt"
-        self.base_url = "https://ctfhunt.com/api"
     
     async def scrape(self) -> List[CTFEvent]:
         events = []
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(f"{self.base_url}/events", 
-                                          headers={"User-Agent": f"{__tool_name__}/{__version__}"})
-                data = response.json()
-            
-            for item in data:
-                try:
-                    event = CTFEvent()
-                    event.title = item.get("title", "Unknown CTF")
-                    event.source = "CTF Hunt"
-                    event.source_id = str(item.get("id", ""))
+            async with httpx.AsyncClient(timeout=self.timeout, verify=False) as client:
+                response = await client.get(
+                    "https://ctfhunt.com/api/events",
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Accept": "application/json"
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
                     
-                    # Dates
-                    start_str = item.get("start", "")
-                    end_str = item.get("end", "")
-                    if start_str:
-                        event.start_date = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
-                    if end_str:
-                        event.end_date = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
-                    
-                    # Location
-                    location = item.get("location", "")
-                    if location and "online" not in location.lower():
-                        event.is_online = False
-                        event.is_offline = True
-                        event.location = f"📍 {location}"
-                    else:
-                        event.is_online = True
-                        event.location = "🌐 Online"
-                    
-                    # Links
-                    event.website_url = item.get("url", "")
-                    event.registration_url = item.get("registration_url", "") or event.website_url
-                    
-                    # Description
-                    event.description = item.get("description", "")
-                    event.short_description = event.description[:200] if event.description else ""
-                    
-                    # Format
-                    format_str = item.get("format", "").lower()
-                    if "jeopardy" in format_str:
-                        event.format_type = CTFFormat.JEOPARDY
-                    elif "attack" in format_str:
-                        event.format_type = CTFFormat.ATTACK_DEFENSE
-                    
-                    # Statistics
-                    event.participants_count = item.get("participants", 0)
-                    
-                    # Organizer
-                    event.organizer_name = item.get("organizer", "Unknown")
-                    
-                    # Tags
-                    tags = item.get("tags", [])
-                    if tags:
-                        event.tags = tags
-                    
-                    # Duration
-                    event.calculate_duration()
-                    
-                    events.append(event)
-                except Exception:
-                    continue
-                    
-        except Exception:
+                    for item in data:
+                        try:
+                            event = CTFEvent()
+                            event.title = item.get("title", "Unknown CTF")
+                            event.source = "CTF Hunt"
+                            event.source_id = str(item.get("id", ""))
+                            
+                            # Dates
+                            start_str = item.get("start", "")
+                            end_str = item.get("end", "")
+                            if start_str:
+                                event.start_date = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                            if end_str:
+                                event.end_date = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+                            
+                            # Location
+                            location = item.get("location", "")
+                            if location and "online" not in location.lower():
+                                event.is_online = False
+                                event.is_offline = True
+                                event.location = f"📍 {location}"
+                            else:
+                                event.is_online = True
+                                event.location = "🌐 Online"
+                            
+                            # Links
+                            event.website_url = item.get("url", "")
+                            event.registration_url = item.get("registration_url", "") or event.website_url
+                            
+                            # Description
+                            event.description = item.get("description", "")
+                            event.short_description = event.description[:200] if event.description else ""
+                            
+                            # Format
+                            format_str = item.get("format", "").lower()
+                            if "jeopardy" in format_str:
+                                event.format_type = CTFFormat.JEOPARDY
+                            elif "attack" in format_str:
+                                event.format_type = CTFFormat.ATTACK_DEFENSE
+                            
+                            # Statistics
+                            event.participants_count = item.get("participants", 0)
+                            
+                            # Organizer
+                            event.organizer_name = item.get("organizer", "Unknown")
+                            
+                            # Tags
+                            tags = item.get("tags", [])
+                            if tags:
+                                event.tags = tags
+                            
+                            event.calculate_duration()
+                            
+                            if event.title and event.start_date:
+                                events.append(event)
+                                
+                        except Exception:
+                            continue
+                            
+        except Exception as e:
             pass  # CTF Hunt may not always be available
         
         return events
 
-class HackTheBoxCTFScraper(BaseScraper):
-    """Scraper for HackTheBox CTF events"""
+class UnstopCTFScraper(BaseScraper):
+    """Scraper for Unstop CTF events (Indian platform)"""
     
     def __init__(self):
         super().__init__()
-        self.name = "HackTheBox CTF"
-        self.base_url = "https://ctf.hackthebox.com/api"
+        self.name = "Unstop CTF"
     
     async def scrape(self) -> List[CTFEvent]:
         events = []
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                # Get upcoming CTFs
-                response = await client.get(f"{self.base_url}/events/upcoming",
-                                          headers={"User-Agent": f"{__tool_name__}/{__version__}"})
-                data = response.json()
-            
-            for item in data.get("data", []):
-                try:
-                    event = CTFEvent()
-                    event.title = item.get("name", "HTB CTF")
-                    event.source = "HackTheBox"
-                    event.source_id = str(item.get("id", ""))
-                    
-                    # Dates
-                    start_str = item.get("start_date", "")
-                    end_str = item.get("end_date", "")
-                    if start_str:
-                        event.start_date = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
-                    if end_str:
-                        event.end_date = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
-                    
-                    # Location
-                    event.is_online = True
-                    event.location = "🌐 Online"
-                    
-                    # Links
-                    event.website_url = f"https://ctf.hackthebox.com/event/{item.get('id', '')}"
-                    event.registration_url = event.website_url
-                    
-                    # Description
-                    event.description = item.get("description", "")
-                    event.short_description = event.description[:200] if event.description else ""
-                    
-                    # Format
-                    event.format_type = CTFFormat.JEOPARDY
-                    
-                    # Statistics
-                    event.participants_count = item.get("participants_count", 0)
-                    
-                    # Organizer
-                    event.organizer_name = "HackTheBox"
-                    
-                    # Tags
-                    event.tags = ["hackthebox", "htb", "cybersecurity"]
-                    
-                    # Duration
-                    event.calculate_duration()
-                    
-                    # Weight (HTB CTFs are prestigious)
-                    event.weight = 50.0
-                    
-                    events.append(event)
-                except Exception:
-                    continue
-                    
-        except Exception:
-            pass  # HTB API may not always be available
-        
-        return events
-
-class TryHackMeCTFScraper(BaseScraper):
-    """Scraper for TryHackMe CTF events"""
-    
-    def __init__(self):
-        super().__init__()
-        self.name = "TryHackMe CTF"
-    
-    async def scrape(self) -> List[CTFEvent]:
-        events = []
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            
-            try:
-                await page.goto("https://tryhackme.com/ctfs", 
-                              timeout=self.timeout * 1000)
-                await page.wait_for_load_state("networkidle")
-                await page.wait_for_timeout(3000)
+            async with httpx.AsyncClient(timeout=self.timeout, verify=False, follow_redirects=True) as client:
+                response = await client.get(
+                    "https://unstop.com/api/public/opportunity/search?opptype=competitions&category=ctf&per_page=20&page=1",
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Accept": "application/json",
+                        "Origin": "https://unstop.com",
+                        "Referer": "https://unstop.com/"
+                    }
+                )
                 
-                # Get CTF cards
-                cards = await page.query_selector_all('.ctf-card, [class*="ctf"]')
-                
-                for card in cards[:50]:
-                    try:
-                        event = CTFEvent()
-                        
-                        # Title
-                        title_el = await card.query_selector('h3, .title, .name')
-                        if title_el:
-                            event.title = (await title_el.inner_text()).strip()
-                        
-                        # Link
-                        link_el = await card.query_selector('a')
-                        if link_el:
-                            href = await link_el.get_attribute('href')
-                            if href:
-                                event.website_url = f"https://tryhackme.com{href}"
-                                event.registration_url = event.website_url
-                        
-                        # Description
-                        desc_el = await card.query_selector('p, .description')
-                        if desc_el:
-                            event.description = (await desc_el.inner_text()).strip()
-                            event.short_description = event.description[:200]
-                        
-                        # Date
-                        date_el = await card.query_selector('.date, time, [class*="date"]')
-                        if date_el:
-                            date_text = (await date_el.inner_text()).strip()
-                            # Parse date
-                            date_match = re.search(r'(\d{1,2}\s+\w+\s+\d{4})', date_text)
-                            if date_match:
-                                try:
-                                    event.start_date = datetime.strptime(date_match.group(1), "%d %B %Y").replace(tzinfo=timezone.utc)
-                                    event.end_date = event.start_date + timedelta(days=3)
-                                except:
-                                    pass
-                        
-                        # Set defaults
-                        event.source = "TryHackMe"
-                        event.is_online = True
-                        event.location = "🌐 Online"
-                        event.format_type = CTFFormat.JEOPARDY
-                        event.organizer_name = "TryHackMe"
-                        event.tags = ["tryhackme", "thm", "beginner-friendly"]
-                        event.weight = 25.0
-                        event.difficulty = DifficultyLevel.BEGINNER
-                        event.calculate_duration()
-                        
-                        if event.title:
-                            events.append(event)
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Parse Unstop response
+                    opportunities = data.get("data", {}).get("data", [])
+                    if not opportunities:
+                        opportunities = data.get("opportunities", [])
+                    
+                    for item in opportunities:
+                        try:
+                            event = CTFEvent()
+                            event.title = item.get("name", item.get("title", "Unstop CTF"))
+                            event.source = "Unstop"
+                            event.source_id = str(item.get("id", ""))
+                            event.country = "India"
                             
-                    except Exception:
-                        continue
-                        
-            except Exception as e:
-                console.print(f"[yellow]TryHackMe scrape warning: {e}[/yellow]")
-            finally:
-                await browser.close()
+                            # Dates
+                            start_str = item.get("start_date", item.get("startDate", ""))
+                            end_str = item.get("end_date", item.get("endDate", ""))
+                            if start_str:
+                                try:
+                                    event.start_date = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                                except:
+                                    event.start_date = datetime.now(timezone.utc) + timedelta(days=30)
+                            if end_str:
+                                try:
+                                    event.end_date = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+                                except:
+                                    event.end_date = event.start_date + timedelta(days=2) if event.start_date else None
+                            
+                            # Location
+                            location = item.get("location", item.get("venue", ""))
+                            if location:
+                                event.is_offline = True
+                                event.is_online = False
+                                event.location = f"📍 {location}"
+                                
+                                # Detect state
+                                for state_name in INDIAN_STATES.values():
+                                    if state_name.lower() in location.lower():
+                                        event.state = state_name
+                                        break
+                            else:
+                                event.is_online = True
+                                event.location = "🌐 Online"
+                            
+                            # Links
+                            slug = item.get("slug", item.get("opportunity_slug", ""))
+                            if slug:
+                                event.website_url = f"https://unstop.com/competition/{slug}"
+                                event.registration_url = event.website_url
+                            
+                            # Description
+                            event.description = item.get("description", item.get("short_description", ""))
+                            event.short_description = event.description[:200] if event.description else ""
+                            
+                            # Organizer
+                            org = item.get("organizer", item.get("college", item.get("company", {})))
+                            if isinstance(org, dict):
+                                event.organizer_name = org.get("name", "Unknown")
+                            elif isinstance(org, str):
+                                event.organizer_name = org
+                            
+                            # Tags
+                            event.tags = ["ctf", "india", "unstop"]
+                            
+                            # Set defaults for Indian CTFs
+                            event.format_type = CTFFormat.JEOPARDY
+                            event.weight = 30.0
+                            event.difficulty = DifficultyLevel.INTERMEDIATE
+                            event.calculate_duration()
+                            
+                            if event.title:
+                                events.append(event)
+                                
+                        except Exception:
+                            continue
+                            
+        except Exception as e:
+            console.print(f"[yellow]Unstop scrape warning: {str(e)[:100]}[/yellow]")
         
         return events
 
-class PicoCTFScraper(BaseScraper):
-    """Scraper for PicoCTF events"""
+class DevfolioCTFScraper(BaseScraper):
+    """Scraper for Devfolio CTF/hackathon events"""
     
     def __init__(self):
         super().__init__()
-        self.name = "PicoCTF"
+        self.name = "Devfolio CTF"
     
     async def scrape(self) -> List[CTFEvent]:
         events = []
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get("https://picoctf.org/api/events",
-                                          headers={"User-Agent": f"{__tool_name__}/{__version__}"})
-                data = response.json()
-            
-            for item in data.get("events", []):
-                try:
-                    event = CTFEvent()
-                    event.title = item.get("title", "PicoCTF")
-                    event.source = "PicoCTF"
-                    event.source_id = str(item.get("id", ""))
+            async with httpx.AsyncClient(timeout=self.timeout, verify=False, follow_redirects=True) as client:
+                response = await client.get(
+                    "https://devfolio.co/api/hackathons?filter=open&page=1&limit=20",
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Accept": "application/json",
+                        "Origin": "https://devfolio.co",
+                        "Referer": "https://devfolio.co/"
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    hackathons = data.get("hackathons", [])
                     
-                    # Dates
-                    start_str = item.get("start_date", "")
-                    end_str = item.get("end_date", "")
-                    if start_str:
-                        event.start_date = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
-                    if end_str:
-                        event.end_date = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+                    for item in hackathons:
+                        try:
+                            # Only include CTF-related events
+                            title = item.get("name", "")
+                            if not any(kw in title.lower() for kw in ['ctf', 'capture', 'flag', 'hackathon', 'security', 'cyber']):
+                                continue
+                            
+                            event = CTFEvent()
+                            event.title = title
+                            event.source = "Devfolio"
+                            event.source_id = str(item.get("id", ""))
+                            event.country = "India"
+                            
+                            # Dates
+                            start_str = item.get("start_date", "")
+                            end_str = item.get("end_date", "")
+                            if start_str:
+                                event.start_date = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                            if end_str:
+                                event.end_date = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+                            
+                            # Location
+                            location = item.get("location", "")
+                            if location and "online" not in location.lower():
+                                event.is_offline = True
+                                event.is_online = False
+                                event.location = f"📍 {location}"
+                                
+                                # Detect state
+                                for state_name in INDIAN_STATES.values():
+                                    if state_name.lower() in location.lower():
+                                        event.state = state_name
+                                        break
+                            else:
+                                event.is_online = True
+                                event.location = "🌐 Online"
+                            
+                            # Links
+                            slug = item.get("slug", "")
+                            if slug:
+                                event.website_url = f"https://devfolio.co/{slug}"
+                                event.registration_url = event.website_url
+                            
+                            # Description
+                            event.description = item.get("description", "")
+                            event.short_description = event.description[:200] if event.description else ""
+                            
+                            # Organizer
+                            org = item.get("organizer", {})
+                            if org:
+                                event.organizer_name = org.get("name", "Unknown")
+                            
+                            # Tags
+                            event.tags = ["ctf", "india", "devfolio", "hackathon"]
+                            
+                            # Set defaults
+                            event.format_type = CTFFormat.JEOPARDY
+                            event.weight = 25.0
+                            event.difficulty = DifficultyLevel.INTERMEDIATE
+                            event.calculate_duration()
+                            
+                            if event.title:
+                                events.append(event)
+                                
+                        except Exception:
+                            continue
+                            
+        except Exception as e:
+            console.print(f"[yellow]Devfolio scrape warning: {str(e)[:100]}[/yellow]")
+        
+        return events
+
+class D2CCTFScraper(BaseScraper):
+    """Scraper for D2C (Devil2Coding) CTF events"""
+    
+    def __init__(self):
+        super().__init__()
+        self.name = "D2C CTF"
+    
+    async def scrape(self) -> List[CTFEvent]:
+        events = []
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout, verify=False, follow_redirects=True) as client:
+                response = await client.get(
+                    "https://d2c.in/api/ctf/events",
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Accept": "application/json"
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    ctfs = data.get("events", data.get("data", []))
                     
-                    # Location
-                    event.is_online = True
-                    event.location = "🌐 Online"
+                    for item in ctfs:
+                        try:
+                            event = CTFEvent()
+                            event.title = item.get("title", item.get("name", "D2C CTF"))
+                            event.source = "D2C"
+                            event.source_id = str(item.get("id", ""))
+                            event.country = "India"
+                            
+                            # Dates
+                            start_str = item.get("start_date", item.get("start", ""))
+                            end_str = item.get("end_date", item.get("end", ""))
+                            if start_str:
+                                try:
+                                    event.start_date = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                                except:
+                                    event.start_date = datetime.now(timezone.utc) + timedelta(days=45)
+                            if end_str:
+                                try:
+                                    event.end_date = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+                                except:
+                                    event.end_date = event.start_date + timedelta(days=3) if event.start_date else None
+                            
+                            # Location
+                            location = item.get("location", "")
+                            if location:
+                                event.is_offline = True
+                                event.is_online = False
+                                event.location = f"📍 {location}"
+                                for state_name in INDIAN_STATES.values():
+                                    if state_name.lower() in location.lower():
+                                        event.state = state_name
+                                        break
+                            else:
+                                event.is_online = True
+                                event.location = "🌐 Online"
+                            
+                            # Links
+                            event.website_url = item.get("url", item.get("website", "https://d2c.in"))
+                            event.registration_url = item.get("registration_url", event.website_url)
+                            
+                            # Description
+                            event.description = item.get("description", "")
+                            event.short_description = event.description[:200] if event.description else ""
+                            
+                            # Organizer
+                            event.organizer_name = item.get("organizer", "D2C")
+                            
+                            # Tags
+                            event.tags = ["ctf", "india", "d2c"]
+                            
+                            # Set defaults
+                            event.format_type = CTFFormat.JEOPARDY
+                            event.weight = 35.0
+                            event.difficulty = DifficultyLevel.INTERMEDIATE
+                            event.calculate_duration()
+                            
+                            if event.title:
+                                events.append(event)
+                                
+                        except Exception:
+                            continue
+                            
+        except Exception as e:
+            pass  # D2C may not always be available
+        
+        return events
+
+class HackerOneCTFScraper(BaseScraper):
+    """Scraper for HackerOne CTF events"""
+    
+    def __init__(self):
+        super().__init__()
+        self.name = "HackerOne CTF"
+    
+    async def scrape(self) -> List[CTFEvent]:
+        events = []
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout, verify=False) as client:
+                response = await client.get(
+                    "https://hackerone.com/ctf/events",
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Accept": "application/json"
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
                     
-                    # Links
-                    event.website_url = item.get("url", "https://picoctf.org")
-                    event.registration_url = item.get("registration_url", "https://picoctf.org")
-                    
-                    # Description
-                    event.description = item.get("description", "")
-                    event.short_description = event.description[:200] if event.description else ""
-                    
-                    # Format
-                    event.format_type = CTFFormat.JEOPARDY
-                    
-                    # Statistics
-                    event.participants_count = item.get("participants", 0)
-                    
-                    # Organizer
-                    event.organizer_name = "Carnegie Mellon University"
-                    
-                    # Tags
-                    event.tags = ["picoctf", "education", "beginner-friendly", "k-12"]
-                    
-                    # Difficulty
-                    event.difficulty = DifficultyLevel.BEGINNER
-                    
-                    # Duration
-                    event.calculate_duration()
-                    
-                    # Weight
-                    event.weight = 30.0
-                    
-                    events.append(event)
-                except Exception:
-                    continue
-                    
-        except Exception:
-            pass  # PicoCTF API may not always be available
+                    for item in data:
+                        try:
+                            event = CTFEvent()
+                            event.title = item.get("title", "HackerOne CTF")
+                            event.source = "HackerOne"
+                            event.source_id = str(item.get("id", ""))
+                            
+                            # Dates
+                            start_str = item.get("start_date", "")
+                            end_str = item.get("end_date", "")
+                            if start_str:
+                                event.start_date = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                            if end_str:
+                                event.end_date = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+                            
+                            # Online only
+                            event.is_online = True
+                            event.location = "🌐 Online"
+                            
+                            # Links
+                            event.website_url = item.get("url", "https://hackerone.com/ctf")
+                            event.registration_url = event.website_url
+                            
+                            # Description
+                            event.description = item.get("description", "")
+                            event.short_description = event.description[:200] if event.description else ""
+                            
+                            # Organizer
+                            event.organizer_name = "HackerOne"
+                            
+                            # Tags
+                            event.tags = ["ctf", "bugbounty", "hackerone"]
+                            
+                            # Set defaults
+                            event.format_type = CTFFormat.JEOPARDY
+                            event.weight = 60.0
+                            event.difficulty = DifficultyLevel.ADVANCED
+                            event.calculate_duration()
+                            
+                            if event.title:
+                                events.append(event)
+                                
+                        except Exception:
+                            continue
+                            
+        except Exception as e:
+            pass  # HackerOne may not always be available
         
         return events
 
@@ -1018,17 +1080,6 @@ class CTFIntelligenceEngine:
     """Advanced CTF data enrichment and intelligence"""
     
     def __init__(self):
-        self.known_organizers = {
-            "carnegie mellon university": {"country": "USA", "reputation": 90},
-            "hackthebox": {"country": "Global", "reputation": 85},
-            "tryhackme": {"country": "Global", "reputation": 75},
-            "google": {"country": "USA", "reputation": 95},
-            "def con": {"country": "USA", "reputation": 100},
-            "nullcon": {"country": "India", "reputation": 80},
-            "bi0s": {"country": "India", "reputation": 85},
-            "infosec iit": {"country": "India", "reputation": 75},
-        }
-        
         self.indian_cities_states = {
             "bengaluru": "Karnataka", "bangalore": "Karnataka",
             "mumbai": "Maharashtra", "pune": "Maharashtra",
@@ -1039,27 +1090,27 @@ class CTFIntelligenceEngine:
             "kochi": "Kerala", "thiruvananthapuram": "Kerala",
             "chandigarh": "Chandigarh", "bhopal": "Madhya Pradesh",
             "indore": "Madhya Pradesh", "goa": "Goa",
+            "surat": "Gujarat", "visakhapatnam": "Andhra Pradesh",
+            "guwahati": "Assam", "patna": "Bihar",
+            "ranchi": "Jharkhand", "bhubaneswar": "Odisha",
+            "dehradun": "Uttarakhand", "shimla": "Himachal Pradesh",
+            "srinagar": "Jammu and Kashmir", "amritsar": "Punjab",
+            "nagpur": "Maharashtra", "thane": "Maharashtra",
+            "agra": "Uttar Pradesh", "varanasi": "Uttar Pradesh",
+            "nashik": "Maharashtra", "aurangabad": "Maharashtra",
+            "vadodara": "Gujarat", "rajkot": "Gujarat",
+            "coimbatore": "Tamil Nadu", "madurai": "Tamil Nadu",
+            "mangalore": "Karnataka", "mysore": "Karnataka",
         }
     
     def enrich_event(self, event: CTFEvent) -> CTFEvent:
         """Enrich event with additional intelligence"""
-        
-        # Detect Indian states from location
         self._detect_indian_location(event)
-        
-        # Enrich organizer info
         self._enrich_organizer(event)
-        
-        # Detect difficulty
         self._detect_difficulty(event)
-        
-        # Generate tags
         self._generate_tags(event)
-        
-        # Calculate data quality
         self._calculate_data_quality(event)
         
-        # Generate unique ID
         if not event.id:
             event.id = self._generate_id(event)
         
@@ -1068,10 +1119,6 @@ class CTFIntelligenceEngine:
     def _detect_indian_location(self, event: CTFEvent):
         """Detect if event is in India and identify state"""
         location_lower = event.location.lower()
-        
-        # Check if in India
-        if "india" in location_lower or "in" in location_lower:
-            event.country = "India"
         
         # Check for Indian cities
         for city, state in self.indian_cities_states.items():
@@ -1082,20 +1129,20 @@ class CTFIntelligenceEngine:
                 break
         
         # Check for state names
-        for state in INDIAN_STATES:
-            if state.lower() in location_lower:
-                event.state = state
+        for state_name in INDIAN_STATES.values():
+            if state_name.lower() in location_lower:
+                event.state = state_name
                 event.country = "India"
                 break
     
     def _enrich_organizer(self, event: CTFEvent):
         """Enrich organizer information"""
-        organizer_lower = event.organizer_name.lower()
+        known_indian_orgs = ["bi0s", "infosec iit", "nullcon", "d2c", "devfolio", "unstop"]
+        org_lower = event.organizer_name.lower()
         
-        for known_org, info in self.known_organizers.items():
-            if known_org in organizer_lower:
-                if info["country"] != "Global" and event.country == "Global":
-                    event.country = info["country"]
+        for org in known_indian_orgs:
+            if org in org_lower:
+                event.country = "India"
                 break
     
     def _detect_difficulty(self, event: CTFEvent):
@@ -1103,19 +1150,16 @@ class CTFIntelligenceEngine:
         title_lower = event.title.lower()
         desc_lower = event.description.lower()
         
-        # Beginner indicators
         beginner_keywords = ["beginner", "junior", "intro", "101", "easy", "learning"]
         if any(kw in title_lower or kw in desc_lower for kw in beginner_keywords):
             event.difficulty = DifficultyLevel.BEGINNER
             return
         
-        # Expert indicators
         expert_keywords = ["expert", "hard", "advanced", "master", "elite"]
         if any(kw in title_lower or kw in desc_lower for kw in expert_keywords):
             event.difficulty = DifficultyLevel.EXPERT
             return
         
-        # Weight-based difficulty
         if event.weight > 75:
             event.difficulty = DifficultyLevel.EXPERT
         elif event.weight > 50:
@@ -1128,24 +1172,16 @@ class CTFIntelligenceEngine:
     def _generate_tags(self, event: CTFEvent):
         """Generate relevant tags for the event"""
         tags = set(event.tags)
-        
-        # Add format-based tags
         tags.add(event.format_type.value.lower().replace("-", "").replace(" ", ""))
-        
-        # Add difficulty tag
         tags.add(event.difficulty.value.lower())
         
-        # Add location tags
         if event.country:
             tags.add(event.country.lower())
         if event.state:
             tags.add(event.state.lower().replace(" ", ""))
-        
-        # Add organizer tag
         if event.organizer_name:
             tags.add(event.organizer_name.lower().replace(" ", ""))
         
-        # Add online/offline tag
         if event.is_online:
             tags.add("online")
         if event.is_offline:
@@ -1191,15 +1227,11 @@ class CTFIntelligenceEngine:
 class AnalyticsEngine:
     """CTF Analytics and Statistics Engine"""
     
-    def __init__(self):
-        self.analytics = CTFAnalytics()
-    
     def analyze_events(self, events: List[CTFEvent]) -> CTFAnalytics:
         """Analyze a list of CTF events and generate statistics"""
         analytics = CTFAnalytics()
         analytics.total_events = len(events)
         
-        # Count by category
         format_counts = defaultdict(int)
         difficulty_counts = defaultdict(int)
         source_counts = defaultdict(int)
@@ -1214,37 +1246,22 @@ class AnalyticsEngine:
         total_prize = 0
         
         for event in events:
-            # Format distribution
             format_counts[event.format_type.value] += 1
-            
-            # Difficulty distribution
             difficulty_counts[event.difficulty.value] += 1
-            
-            # Source distribution
             source_counts[event.source] += 1
             
-            # Country distribution
             if event.country:
                 country_counts[event.country] += 1
-            
-            # State distribution
             if event.state:
                 state_counts[event.state] += 1
-            
-            # Monthly trend
             if event.start_date:
                 month_key = event.start_date.strftime("%Y-%m")
                 monthly_counts[month_key] += 1
-            
-            # Organizer counts
             if event.organizer_name:
                 organizer_counts[event.organizer_name] += 1
-            
-            # Tag counts
             for tag in event.tags:
                 tag_counts[tag] += 1
             
-            # Location type
             if event.is_online:
                 analytics.online_events += 1
             if event.is_offline:
@@ -1252,32 +1269,24 @@ class AnalyticsEngine:
             if event.is_hybrid:
                 analytics.hybrid_events += 1
             
-            # Averages
             total_weight += event.weight
             total_participants += event.participants_count
             total_prize += event.prize_pool_total
         
-        # Calculate averages
         if events:
             analytics.average_weight = round(total_weight / len(events), 2)
             analytics.average_participants = round(total_participants / len(events), 2)
             analytics.total_prize_pool = total_prize
         
-        # Distribution dicts
         analytics.format_distribution = dict(format_counts)
         analytics.difficulty_distribution = dict(difficulty_counts)
         analytics.source_distribution = dict(source_counts)
         analytics.country_distribution = dict(country_counts)
         analytics.state_distribution = dict(state_counts)
         analytics.monthly_trend = dict(sorted(monthly_counts.items()))
-        
-        # Top organizers
         analytics.top_organizers = sorted(organizer_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-        
-        # Top tags
         analytics.top_tags = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:20]
         
-        self.analytics = analytics
         return analytics
     
     def display_analytics(self, analytics: CTFAnalytics):
@@ -1302,6 +1311,19 @@ class AnalyticsEngine:
         
         console.print(Panel(overview, title="[bold]Overview[/bold]", border_style="green"))
         
+        # Source Distribution
+        source_table = Table(show_header=True, box=box.ROUNDED)
+        source_table.add_column("Source", style="bold")
+        source_table.add_column("Count", justify="right", style="cyan")
+        source_table.add_column("Percentage", justify="right", style="green")
+        
+        total = sum(analytics.source_distribution.values())
+        for src, count in sorted(analytics.source_distribution.items(), key=lambda x: x[1], reverse=True):
+            pct = (count / total * 100) if total > 0 else 0
+            source_table.add_row(src, str(count), f"{pct:.1f}%")
+        
+        console.print(Panel(source_table, title="[bold]Source Distribution[/bold]", border_style="blue"))
+        
         # Format Distribution
         format_table = Table(show_header=True, box=box.ROUNDED)
         format_table.add_column("Format", style="bold")
@@ -1313,20 +1335,7 @@ class AnalyticsEngine:
             pct = (count / total * 100) if total > 0 else 0
             format_table.add_row(fmt, str(count), f"{pct:.1f}%")
         
-        console.print(Panel(format_table, title="[bold]Format Distribution[/bold]", border_style="blue"))
-        
-        # Difficulty Distribution
-        diff_table = Table(show_header=True, box=box.ROUNDED)
-        diff_table.add_column("Difficulty", style="bold")
-        diff_table.add_column("Count", justify="right", style="cyan")
-        diff_table.add_column("Percentage", justify="right", style="green")
-        
-        total = sum(analytics.difficulty_distribution.values())
-        for diff, count in sorted(analytics.difficulty_distribution.items(), key=lambda x: x[1], reverse=True):
-            pct = (count / total * 100) if total > 0 else 0
-            diff_table.add_row(diff, str(count), f"{pct:.1f}%")
-        
-        console.print(Panel(diff_table, title="[bold]Difficulty Distribution[/bold]", border_style="yellow"))
+        console.print(Panel(format_table, title="[bold]Format Distribution[/bold]", border_style="yellow"))
         
         # Top Organizers
         org_table = Table(show_header=True, box=box.ROUNDED)
@@ -1338,28 +1347,6 @@ class AnalyticsEngine:
             org_table.add_row(str(i), org, str(count))
         
         console.print(Panel(org_table, title="[bold]Top Organizers[/bold]", border_style="magenta"))
-        
-        # Top Tags
-        tag_table = Table(show_header=True, box=box.ROUNDED)
-        tag_table.add_column("Rank", justify="center", style="bold")
-        tag_table.add_column("Tag", style="bold")
-        tag_table.add_column("Count", justify="right", style="cyan")
-        
-        for i, (tag, count) in enumerate(analytics.top_tags[:10], 1):
-            tag_table.add_row(str(i), tag, str(count))
-        
-        console.print(Panel(tag_table, title="[bold]Top Tags[/bold]", border_style="cyan"))
-        
-        # Monthly Trend
-        if analytics.monthly_trend:
-            trend_table = Table(show_header=True, box=box.ROUNDED)
-            trend_table.add_column("Month", style="bold")
-            trend_table.add_column("Events", justify="right", style="cyan")
-            
-            for month, count in list(analytics.monthly_trend.items())[-6:]:  # Last 6 months
-                trend_table.add_row(month, str(count))
-            
-            console.print(Panel(trend_table, title="[bold]Monthly Trend (Last 6 Months)[/bold]", border_style="green"))
 
 # ==================== EXPORT ENGINE ====================
 class ExportEngine:
@@ -1367,7 +1354,6 @@ class ExportEngine:
     
     @staticmethod
     def export_json(events: List[CTFEvent], filename: str = None) -> str:
-        """Export events to JSON file"""
         if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"ctfforge_export_{timestamp}.json"
@@ -1381,7 +1367,6 @@ class ExportEngine:
     
     @staticmethod
     def export_csv(events: List[CTFEvent], filename: str = None) -> str:
-        """Export events to CSV file"""
         if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"ctfforge_export_{timestamp}.csv"
@@ -1389,7 +1374,6 @@ class ExportEngine:
         with open(filename, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             
-            # Header
             writer.writerow([
                 "Title", "Start Date", "End Date", "Duration (hours)",
                 "Location", "Country", "State", "City",
@@ -1399,7 +1383,6 @@ class ExportEngine:
                 "Prize Pool", "Tags", "AI Score", "Status"
             ])
             
-            # Data
             for event in events:
                 writer.writerow([
                     event.title,
@@ -1423,73 +1406,6 @@ class ExportEngine:
                     event.ai_score,
                     event.get_status().value
                 ])
-        
-        return filename
-    
-    @staticmethod
-    def export_markdown(events: List[CTFEvent], filename: str = None) -> str:
-        """Export events to Markdown file"""
-        if not filename:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"ctfforge_export_{timestamp}.md"
-        
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write(f"# CTF Events Export\n\n")
-            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-            f.write(f"Total Events: {len(events)}\n\n")
-            
-            for i, event in enumerate(events, 1):
-                f.write(f"## {i}. {event.title}\n\n")
-                f.write(f"- **Start:** {event.start_date.strftime('%Y-%m-%d %H:%M UTC') if event.start_date else 'N/A'}\n")
-                f.write(f"- **End:** {event.end_date.strftime('%Y-%m-%d %H:%M UTC') if event.end_date else 'N/A'}\n")
-                f.write(f"- **Duration:** {event.duration_hours:.1f} hours\n")
-                f.write(f"- **Location:** {event.location}\n")
-                f.write(f"- **Format:** {event.format_type.value}\n")
-                f.write(f"- **Difficulty:** {event.difficulty.value}\n")
-                f.write(f"- **Organizer:** {event.organizer_name}\n")
-                f.write(f"- **Participants:** {event.participants_count}\n")
-                f.write(f"- **Weight:** {event.weight}\n")
-                f.write(f"- **AI Score:** {event.ai_score}\n")
-                f.write(f"- **Status:** {event.get_status().value}\n")
-                f.write(f"- **Registration:** {event.registration_url}\n")
-                f.write(f"- **Website:** {event.website_url}\n\n")
-                
-                if event.description:
-                    f.write(f"### Description\n\n{event.description[:500]}...\n\n")
-                
-                if event.tags:
-                    f.write(f"**Tags:** {', '.join(event.tags)}\n\n")
-                
-                f.write("---\n\n")
-        
-        return filename
-    
-    @staticmethod
-    def export_ics(events: List[CTFEvent], filename: str = None) -> str:
-        """Export events to iCalendar file"""
-        if not filename:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"ctfforge_export_{timestamp}.ics"
-        
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write("BEGIN:VCALENDAR\n")
-            f.write("VERSION:2.0\n")
-            f.write("PRODID:-//CTFForge//EN\n")
-            
-            for event in events:
-                if event.start_date and event.end_date:
-                    f.write("BEGIN:VEVENT\n")
-                    f.write(f"UID:{event.id}@ctfforge\n")
-                    f.write(f"DTSTART:{event.start_date.strftime('%Y%m%dT%H%M%SZ')}\n")
-                    f.write(f"DTEND:{event.end_date.strftime('%Y%m%dT%H%M%SZ')}\n")
-                    f.write(f"SUMMARY:{event.title}\n")
-                    f.write(f"DESCRIPTION:{event.short_description}\n")
-                    f.write(f"LOCATION:{event.location}\n")
-                    f.write(f"URL:{event.registration_url}\n")
-                    f.write(f"ORGANIZER;CN={event.organizer_name}:{event.organizer_url or ''}\n")
-                    f.write("END:VEVENT\n")
-            
-            f.write("END:VCALENDAR\n")
         
         return filename
 
@@ -1533,63 +1449,69 @@ class CTFForgeApp:
             "[bold]Main Menu[/bold]\n\n"
             "1. 🔍 Find CTF Events\n"
             "2. 📊 View Analytics Dashboard\n"
-            "3. ⚙️ Configure Settings\n"
-            "4. 📖 View Help & Documentation\n"
-            "5. 🚪 Exit",
+            "3. 📖 View Help & Documentation\n"
+            "4. 🚪 Exit",
             border_style="cyan",
             title="[bold]Navigation[/bold]"
         )
         console.print(menu)
         
-        choice = Prompt.ask("Select option", choices=["1", "2", "3", "4", "5"], default="1")
+        choice = Prompt.ask("Select option", choices=["1", "2", "3", "4"], default="1")
         return choice
     
     def select_states(self) -> List[str]:
-        """Interactive state selection"""
+        """Interactive state selection - Complete list of all 36 states/UTs"""
         console.print(Panel.fit(
             "[bold yellow]🌏 Select Indian States for Local CTF Discovery[/bold yellow]",
             border_style="yellow"
         ))
         
-        # Group states by region
-        regions = defaultdict(list)
-        for state, info in INDIAN_STATES.items():
-            regions[info["region"]].append(state)
+        console.print("\n[bold]All Indian States & Union Territories:[/bold]\n")
         
-        console.print("\n[bold]Available Regions:[/bold]")
-        region_list = list(regions.keys())
-        for i, region in enumerate(region_list, 1):
-            console.print(f"  [cyan]{i}.[/cyan] {region} ({len(regions[region])} states)")
+        # Display all states in columns
+        for i in range(1, 37, 3):
+            row = ""
+            for j in range(3):
+                idx = i + j
+                if idx <= 36:
+                    state = INDIAN_STATES[idx]
+                    row += f"  [cyan]{idx:2d}.[/cyan] {state:<35}"
+            console.print(row)
         
         console.print("\n[bold]Options:[/bold]")
         console.print("  [green]all[/green] - Select all states")
-        console.print("  [green]region N[/green] - Select all states in a region")
         console.print("  [green]1,2,3[/green] - Select specific states by number")
+        console.print("  [green]1-10[/green] - Select a range of states")
         
-        choice = Prompt.ask("Your selection", default="all")
+        choice = Prompt.ask("\nYour selection", default="all")
         
         if choice.lower() == "all":
-            return list(INDIAN_STATES.keys())
+            return list(INDIAN_STATES.values())
         
-        if choice.lower().startswith("region"):
-            try:
-                region_idx = int(choice.split()[1]) - 1
-                if 0 <= region_idx < len(region_list):
-                    return regions[region_list[region_idx]]
-            except:
-                pass
-        
-        # Parse individual state numbers
         selected = []
-        for num in choice.split(","):
+        
+        # Handle ranges
+        if "-" in choice:
             try:
-                idx = int(num.strip()) - 1
-                if 0 <= idx < len(INDIAN_STATES):
-                    selected.append(list(INDIAN_STATES.keys())[idx])
+                parts = choice.split("-")
+                start = int(parts[0].strip())
+                end = int(parts[1].strip())
+                for i in range(start, end + 1):
+                    if i in INDIAN_STATES:
+                        selected.append(INDIAN_STATES[i])
             except:
                 pass
+        else:
+            # Parse individual state numbers
+            for num in choice.split(","):
+                try:
+                    idx = int(num.strip())
+                    if idx in INDIAN_STATES:
+                        selected.append(INDIAN_STATES[idx])
+                except:
+                    pass
         
-        return selected if selected else list(INDIAN_STATES.keys())[:5]
+        return selected if selected else list(INDIAN_STATES.values())
     
     async def scrape_events(self) -> List[CTFEvent]:
         """Scrape events from all sources"""
@@ -1599,9 +1521,10 @@ class CTFForgeApp:
             CTFtimeAPIScraper(),
             CTFtimeHTMLScraper(),
             CTFHuntScraper(),
-            HackTheBoxCTFScraper(),
-            TryHackMeCTFScraper(),
-            PicoCTFScraper()
+            UnstopCTFScraper(),
+            DevfolioCTFScraper(),
+            D2CCTFScraper(),
+            HackerOneCTFScraper()
         ]
         
         all_events = []
@@ -1621,9 +1544,12 @@ class CTFForgeApp:
                 try:
                     events = await scraper.scrape()
                     all_events.extend(events)
-                    console.print(f"  [green]✅ {scraper.name}: {len(events)} events found[/green]")
+                    if events:
+                        console.print(f"  [green]✅ {scraper.name}: {len(events)} events found[/green]")
+                    else:
+                        console.print(f"  [yellow]⚠️ {scraper.name}: 0 events found[/yellow]")
                 except Exception as e:
-                    console.print(f"  [red]❌ {scraper.name}: Failed - {str(e)[:50]}[/red]")
+                    console.print(f"  [red]❌ {scraper.name}: Failed - {str(e)[:80]}[/red]")
                 progress.advance(task)
         
         # Enrich events with intelligence
@@ -1642,7 +1568,7 @@ class CTFForgeApp:
                 seen.add(key)
                 unique_events.append(event)
         
-        console.print(f"  [green]✅ Total unique events: {len(unique_events)}[/green]")
+        console.print(f"  [bold green]✅ Total unique events: {len(unique_events)}[/bold green]")
         
         return unique_events
     
@@ -1655,8 +1581,7 @@ class CTFForgeApp:
         console.print("1. All Events")
         console.print("2. Only Upcoming")
         console.print("3. Only Ongoing")
-        console.print("4. Only Completed")
-        status_choice = Prompt.ask("Select", choices=["1", "2", "3", "4"], default="1")
+        status_choice = Prompt.ask("Select", choices=["1", "2", "3"], default="1")
         
         # Format filter
         console.print("\n[bold]Format:[/bold]")
@@ -1665,15 +1590,6 @@ class CTFForgeApp:
         console.print("3. Attack-Defense")
         console.print("4. Mixed")
         format_choice = Prompt.ask("Select", choices=["1", "2", "3", "4"], default="1")
-        
-        # Difficulty filter
-        console.print("\n[bold]Difficulty:[/bold]")
-        console.print("1. All Levels")
-        console.print("2. Beginner")
-        console.print("3. Intermediate")
-        console.print("4. Advanced")
-        console.print("5. Expert")
-        diff_choice = Prompt.ask("Select", choices=["1", "2", "3", "4", "5"], default="1")
         
         # Location filter
         console.print("\n[bold]Location:[/bold]")
@@ -1694,27 +1610,16 @@ class CTFForgeApp:
         # Apply filters
         filtered = events.copy()
         
-        # Status filter
         now = datetime.now(timezone.utc)
         if status_choice == "2":
             filtered = [e for e in filtered if e.start_date and e.start_date > now]
         elif status_choice == "3":
             filtered = [e for e in filtered if e.start_date and e.end_date and e.start_date <= now <= e.end_date]
-        elif status_choice == "4":
-            filtered = [e for e in filtered if e.end_date and e.end_date < now]
         
-        # Format filter
         format_map = {"2": CTFFormat.JEOPARDY, "3": CTFFormat.ATTACK_DEFENSE, "4": CTFFormat.MIXED}
         if format_choice in format_map:
             filtered = [e for e in filtered if e.format_type == format_map[format_choice]]
         
-        # Difficulty filter
-        diff_map = {"2": DifficultyLevel.BEGINNER, "3": DifficultyLevel.INTERMEDIATE, 
-                   "4": DifficultyLevel.ADVANCED, "5": DifficultyLevel.EXPERT}
-        if diff_choice in diff_map:
-            filtered = [e for e in filtered if e.difficulty == diff_map[diff_choice]]
-        
-        # Location filter
         if loc_choice == "2":
             filtered = [e for e in filtered if e.is_online]
         elif loc_choice == "3":
@@ -1722,17 +1627,15 @@ class CTFForgeApp:
         elif loc_choice == "4":
             filtered = [e for e in filtered if e.country == "India"]
         
-        # Weight filter
         weight_map = {"2": 25, "3": 50, "4": 75}
         if weight_choice in weight_map:
             filtered = [e for e in filtered if e.weight >= weight_map[weight_choice]]
         
-        # State filter (if states selected)
+        # State filter
         if self.selected_states:
             state_filtered = []
             for event in filtered:
-                # Include if event is in selected state or is online
-                if event.is_online or event.state in self.selected_states:
+                if event.is_online or event.state in self.selected_states or event.country == "India":
                     state_filtered.append(event)
             filtered = state_filtered
         
@@ -1746,7 +1649,6 @@ class CTFForgeApp:
             console.print("[bold red]No events found matching your criteria.[/bold red]")
             return
         
-        # Create main table
         table = Table(
             title=f"🔐 {len(events)} CTF Events Found",
             show_lines=True,
@@ -1757,34 +1659,30 @@ class CTFForgeApp:
         
         table.add_column("Rank", justify="center", style="cyan", width=4)
         table.add_column("CTF Name", style="bold yellow", width=30)
-        table.add_column("Dates", style="green", width=20)
+        table.add_column("Dates", style="green", width=18)
         table.add_column("Location", style="magenta", width=15)
         table.add_column("Format", justify="center", width=10)
         table.add_column("Difficulty", justify="center", width=10)
         table.add_column("Weight", justify="center", width=6)
         table.add_column("Score", justify="center", width=6)
-        table.add_column("Link", style="blue underline", width=40)
+        table.add_column("Source", justify="center", width=10)
         
         for i, event in enumerate(events[:30], 1):
-            # Format dates
             if event.start_date and event.end_date:
                 date_str = f"{event.start_date.strftime('%d %b')}→{event.end_date.strftime('%d %b')}"
             else:
                 date_str = "TBD"
             
-            # Format location with emoji
-            location = event.location[:20]
+            location = event.location[:18]
             
-            # Format difficulty with color
             diff_colors = {
                 DifficultyLevel.BEGINNER: "green",
                 DifficultyLevel.INTERMEDIATE: "yellow",
                 DifficultyLevel.ADVANCED: "red",
                 DifficultyLevel.EXPERT: "bold red"
             }
-            diff_str = f"[{diff_colors.get(event.difficulty, 'white')}]{event.difficulty.value[:6]}[/]"
+            diff_str = f"[{diff_colors.get(event.difficulty, 'white')}]{event.difficulty.value[:8]}[/]"
             
-            # Format weight with color
             if event.weight > 75:
                 weight_str = f"[bold red]{event.weight:.0f}[/]"
             elif event.weight > 50:
@@ -1794,13 +1692,8 @@ class CTFForgeApp:
             else:
                 weight_str = f"[dim]{event.weight:.0f}[/]"
             
-            # Format AI score
             score_color = "green" if event.ai_score > 75 else "yellow" if event.ai_score > 50 else "red"
             score_str = f"[{score_color}]{event.ai_score:.0f}[/]"
-            
-            # Create clickable link
-            link_text = Text(event.registration_url[:37] + "..." if len(event.registration_url) > 37 else event.registration_url)
-            link_text.stylize(f"link {event.registration_url}")
             
             table.add_row(
                 str(i),
@@ -1811,7 +1704,7 @@ class CTFForgeApp:
                 diff_str,
                 weight_str,
                 score_str,
-                link_text
+                event.source[:8]
             )
         
         console.print(table)
@@ -1821,103 +1714,16 @@ class CTFForgeApp:
         console.print(f"  • Showing top {min(30, len(events))} of {len(events)} events")
         console.print(f"  • Online: {len([e for e in events if e.is_online])} | Offline: {len([e for e in events if e.is_offline])}")
         console.print(f"  • India: {len([e for e in events if e.country == 'India'])} | Global: {len([e for e in events if e.country != 'India'])}")
-    
-    def display_event_details(self, event: CTFEvent):
-        """Display detailed information about a specific event"""
-        console.print("\n")
         
-        # Main details panel
-        details = f"""
-[bold yellow]{event.title}[/bold yellow]
-[dim]{event.subtitle if event.subtitle else ''}[/dim]
-
-[bold]📅 Schedule:[/bold]
-  • Start: {event.start_date.strftime('%A, %B %d, %Y at %H:%M UTC') if event.start_date else 'TBD'}
-  • End: {event.end_date.strftime('%A, %B %d, %Y at %H:%M UTC') if event.end_date else 'TBD'}
-  • Duration: {event.duration_hours:.1f} hours ({event.duration_hours/24:.1f} days)
-  • Status: {event.get_status().value}
-
-[bold]📍 Location:[/bold]
-  • Venue: {event.location}
-  • Country: {event.country}
-  • State: {event.state if event.state else 'N/A'}
-  • City: {event.city if event.city else 'N/A'}
-  • Type: {"Online" if event.is_online else ""}{" + " if event.is_hybrid else ""}{"Offline" if event.is_offline else ""}
-
-[bold]🎯 CTF Details:[/bold]
-  • Format: {event.format_type.value}
-  • Difficulty: {event.difficulty.value}
-  • Weight: {event.weight}
-  • Rating: {event.rating}/5.0
-  • Categories: {', '.join(event.categories_available) if event.categories_available else 'N/A'}
-  • Challenges: {event.challenges_count if event.challenges_count > 0 else 'N/A'}
-
-[bold]👥 Participants:[/bold]
-  • Registered: {event.participants_count}
-  • Max Capacity: {event.max_participants if event.max_participants else 'Unlimited'}
-  • Team Size: {event.team_size_min}-{event.team_size_max} members
-
-[bold]🏆 Prizes:[/bold]
-  • Total Pool: ${event.prize_pool_total:,.2f} {event.prize_currency}
-  • 1st Place: ${event.first_place_prize:,.2f}
-  • 2nd Place: ${event.second_place_prize:,.2f}
-  • 3rd Place: ${event.third_place_prize:,.2f}
-  • Swag: {'✅' if event.has_swag else '❌'}
-  • Certificates: {'✅' if event.has_certificates else '❌'}
-  • Travel Aid: {'✅' if event.has_travel_aid else '❌'}
-
-[bold]🏢 Organizer:[/bold]
-  • Name: {event.organizer_name}
-  • Website: {event.organizer_url if event.organizer_url else 'N/A'}
-  • Email: {event.organizer_email if event.organizer_email else 'N/A'}
-
-[bold]🔗 Links:[/bold]
-  • Register: [link={event.registration_url}]{event.registration_url}[/link]
-  • Website: [link={event.website_url}]{event.website_url}[/link]
-  • CTFtime: [link={event.ctftime_url}]{event.ctftime_url}[/link] if event.ctftime_url else 'N/A'}
-  • Discord: {event.discord_url if event.discord_url else 'N/A'}
-  • Twitter: {event.twitter_url if event.twitter_url else 'N/A'}
-
-[bold]🏷️ Tags:[/bold]
-  {', '.join(f'[cyan]{tag}[/cyan]' for tag in event.tags[:10])}
-
-[bold]📝 Description:[/bold]
-{event.description[:500] if event.description else 'No description available'}...
-
-[bold]🤖 AI Analysis:[/bold]
-  • Score: {event.ai_score}/100
-  • Confidence: {event.ai_confidence}%
-  • Data Quality: {event.data_quality_score}%
-"""
-        
-        console.print(Panel.fit(details, border_style="cyan", title="[bold]Event Details[/bold]"))
-        
-        # Show AI factors
-        if event.ai_factors:
-            factors_table = Table(show_header=True, box=box.ROUNDED)
-            factors_table.add_column("Factor", style="bold")
-            factors_table.add_column("Score", justify="right", style="cyan")
-            factors_table.add_column("Weight", justify="right", style="green")
-            factors_table.add_column("Contribution", justify="right", style="yellow")
-            
-            for factor, score in event.ai_factors.items():
-                weight = self.ai_engine.weights.get(factor, 0)
-                contribution = score * weight
-                factors_table.add_row(
-                    factor.replace("_", " ").title(),
-                    f"{score:.1f}",
-                    f"{weight:.0%}",
-                    f"{contribution:.1f}"
-                )
-            
-            factors_table.add_row(
-                "[bold]Total[/bold]",
-                "",
-                "",
-                f"[bold]{event.ai_score:.1f}[/bold]"
-            )
-            
-            console.print(Panel(factors_table, title="[bold]AI Ranking Factors[/bold]", border_style="green"))
+        # Show Indian state distribution
+        indian_events = [e for e in events if e.state]
+        if indian_events:
+            state_counts = defaultdict(int)
+            for e in indian_events:
+                state_counts[e.state] += 1
+            console.print(f"\n[bold]🇮🇳 Indian State Distribution:[/bold]")
+            for state, count in sorted(state_counts.items(), key=lambda x: x[1], reverse=True):
+                console.print(f"  • {state}: {count} events")
     
     async def run(self):
         """Main application loop"""
@@ -1929,14 +1735,22 @@ class CTFForgeApp:
             if choice == "1":
                 # Find CTF Events
                 self.selected_states = self.select_states()
-                console.print(f"\n[green]Selected {len(self.selected_states)} states[/green]")
+                console.print(f"\n[green]✅ Selected {len(self.selected_states)} states: {', '.join(self.selected_states[:5])}...[/green]")
                 
                 # Scrape events
                 all_events = await self.scrape_events()
                 self.events = all_events
                 
+                if not all_events:
+                    console.print("[bold red]❌ No events found from any source. Check your internet connection.[/bold red]")
+                    continue
+                
                 # Filter events
                 filtered_events = self.filter_events(all_events)
+                
+                if not filtered_events:
+                    console.print("[bold yellow]⚠️ No events match your filters. Try broader criteria.[/bold yellow]")
+                    continue
                 
                 # Rank events
                 console.print("\n[bold cyan]🤖 Applying AI Ranking...[/bold cyan]")
@@ -1950,29 +1764,15 @@ class CTFForgeApp:
                     console.print("\n[bold]Export Format:[/bold]")
                     console.print("1. JSON (Full Data)")
                     console.print("2. CSV (Spreadsheet)")
-                    console.print("3. Markdown (Documentation)")
-                    console.print("4. ICS (Calendar)")
                     
-                    export_choice = Prompt.ask("Select", choices=["1", "2", "3", "4"], default="1")
+                    export_choice = Prompt.ask("Select", choices=["1", "2"], default="1")
                     
-                    export_map = {
-                        "1": self.export_engine.export_json,
-                        "2": self.export_engine.export_csv,
-                        "3": self.export_engine.export_markdown,
-                        "4": self.export_engine.export_ics
-                    }
+                    if export_choice == "1":
+                        filename = self.export_engine.export_json(ranked_events)
+                    else:
+                        filename = self.export_engine.export_csv(ranked_events)
                     
-                    filename = export_map[export_choice](ranked_events)
                     console.print(f"[bold green]✅ Exported to {filename}[/bold green]")
-                
-                # View details
-                if Confirm.ask("\n🔍 View detailed info for a specific event?", default=False):
-                    try:
-                        idx = IntPrompt.ask("Enter rank number") - 1
-                        if 0 <= idx < len(ranked_events):
-                            self.display_event_details(ranked_events[idx])
-                    except:
-                        pass
                 
                 # Show analytics
                 if Confirm.ask("\n📊 Show analytics for these events?", default=False):
@@ -1988,52 +1788,39 @@ class CTFForgeApp:
                     console.print("[yellow]No events loaded. Please find CTF events first.[/yellow]")
             
             elif choice == "3":
-                # Settings
-                console.print(Panel.fit(
-                    "[bold]Settings[/bold]\n\n"
-                    "1. AI Ranking Weights\n"
-                    "2. Scraper Configuration\n"
-                    "3. Export Preferences\n"
-                    "4. Back to Main Menu",
-                    border_style="cyan",
-                    title="[bold]Settings[/bold]"
-                ))
-                Prompt.ask("Select", choices=["1", "2", "3", "4"], default="4")
-            
-            elif choice == "4":
                 # Help
                 console.print(Panel.fit(
                     "[bold]CTFForge Pro Help[/bold]\n\n"
                     "[bold]Quick Start:[/bold]\n"
                     "1. Select 'Find CTF Events'\n"
-                    "2. Choose Indian states\n"
-                    "3. Wait for scraping\n"
+                    "2. Choose Indian states (enter numbers or 'all')\n"
+                    "3. Wait for scraping (7 sources)\n"
                     "4. Apply filters\n"
                     "5. View AI-ranked results\n\n"
                     "[bold]Features:[/bold]\n"
-                    "• Multi-source scraping (6 sources)\n"
-                    "• AI-powered ranking\n"
-                    "• State-wise filtering\n"
-                    "• Multiple export formats\n"
-                    "• Analytics dashboard\n"
-                    "• Clickable links\n\n"
+                    "• 7 CTF sources: CTFtime, CTF Hunt, Unstop, Devfolio, D2C, HackerOne\n"
+                    "• AI-powered ranking with 7 factors\n"
+                    "• All 36 Indian states & UTs supported\n"
+                    "• JSON & CSV export\n"
+                    "• Analytics dashboard\n\n"
                     "[bold]Tips:[/bold]\n"
-                    "• Use 'all' states for maximum results\n"
+                    "• Use 'all' for maximum results\n"
                     "• Apply filters to narrow down\n"
                     "• Export to CSV for team sharing\n"
                     "• Check analytics for trends\n\n"
                     "[bold]Sources:[/bold]\n"
-                    "• CTFtime API & HTML\n"
-                    "• CTF Hunt\n"
-                    "• HackTheBox CTF\n"
-                    "• TryHackMe CTF\n"
-                    "• PicoCTF",
+                    "• CTFtime API & HTML (Global)\n"
+                    "• CTF Hunt (Global)\n"
+                    "• Unstop (Indian CTFs)\n"
+                    "• Devfolio (Indian Hackathons/CTFs)\n"
+                    "• D2C (Indian CTFs)\n"
+                    "• HackerOne (Bug Bounty CTFs)",
                     border_style="green",
                     title="[bold]Help & Documentation[/bold]"
                 ))
                 input("\nPress Enter to continue...")
             
-            elif choice == "5":
+            elif choice == "4":
                 # Exit
                 console.print("\n[bold cyan]👋 Thank you for using CTFForge Pro! Happy Hacking![/bold cyan]")
                 break
@@ -2053,4 +1840,6 @@ if __name__ == "__main__":
         console.print("\n[yellow]Interrupted by user. Exiting...[/yellow]")
     except Exception as e:
         console.print(f"\n[red]Fatal error: {e}[/red]")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
