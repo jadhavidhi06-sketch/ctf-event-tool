@@ -1,91 +1,185 @@
 ================================================================================
-                        EVENTFORGE CLI v2.0
+                         CTFFORGE CLI v3.0
                Made by VRJ • GitHub: jadhavidhi06-sketch
                         LinkedIn: vidhi-jadhav
 ================================================================================
 
 ================================================================================
-                        EVENTFORGE CLI - USER MANUAL
+                         CTFFORGE CLI - USER MANUAL
 ================================================================================
 
 NAME
-    eventforge.py - Discover coding, hackathon, developer and CTF events in India
+    ctfforge.py - Discover Capture The Flag (CTF) events in India and worldwide
 
 SYNOPSIS
-    python eventforge.py
+    python ctfforge.py
 
 DESCRIPTION
-    EventForge is a powerful command-line tool that scrapes live events from
-    Devfolio, Unstop, and CTFtime, ranks them using AI heuristics, and displays
-    them in a beautiful terminal interface.
+    CTFForge is a powerful command-line tool that scrapes live CTF events from
+    multiple sources (CTFtime API, CTFtime HTML, CTF Hunt), ranks them using
+    AI heuristics, and displays them in a beautiful terminal interface with
+    clickable links.
 
 FEATURES
-    • Live scraping from three major platforms
-    • AI-based event ranking (date, participants, location, prestige)
+    • Live scraping from multiple CTF sources
+    • AI-based event ranking (date, participants, location, weight, prizes)
     • Support for single and multi-state selection
     • Shows only ongoing and upcoming events
-    • Full event links for direct registration
-    • Export results to JSON file
+    • Full event links for direct registration (clickable in terminal)
+    • Multiple filter options (upcoming, ongoing, offline, high weight)
+    • Multiple sort options (AI ranked, date, participants, weight)
+    • Export results to JSON and CSV files
+    • Detailed event view with full description
+    • Statistics dashboard
     • No API keys required
 
 STEP-BY-STEP USAGE
 
-1. Event Category Selection
-   -----------------------
-   1. Coding Event
-   2. Developer Event
-   3. Hackathon Event
-   4. CTF Event
-   5. All Events
-
-2. State Selection Mode
+1. State Selection Mode
    --------------------
    • Multi-state selection (recommended)
    • Single state selection
 
-3. State Selection
+2. State Selection
    ---------------
    You will see a numbered list of all Indian states and union territories.
    - For multi: Enter numbers separated by commas (e.g., 14,22,27) or type "all"
    - For single: Enter one number
 
-4. Live Scraping
-   -------------
-   The tool will show a progress spinner while fetching live data.
+3. Filter Options
+   --------------
+   1. All CTF Events
+   2. Only Upcoming CTF Events
+   3. Only Ongoing CTF Events
+   4. Only Offline CTF Events
+   5. Only High Weight CTF Events (>50)
 
-5. Results Display
+4. Sort Options
+   ------------
+   1. AI Ranked (Recommended) - Uses smart heuristics
+   2. By Start Date - Earliest first
+   3. By Participants Count - Most popular first
+   4. By CTF Weight - Highest weight first
+
+5. Live Scraping
+   -------------
+   The tool will show a progress spinner while fetching live data from:
+   • CTFtime API (primary source)
+   • CTFtime HTML (detailed info)
+   • CTF Hunt (additional source)
+
+6. Results Display
    ---------------
    Events are shown in a ranked table with:
-   - Rank (based on AI score)
-   - Title
-   - Dates
-   - Location
-   - Source (Devfolio/Unstop/CTFtime)
-   - Direct Link
-   - AI Score
+   - Rank (based on AI score or sort order)
+   - CTF Name
+   - Dates (start → end)
+   - Location (Online/Offline with state info)
+   - Format (Jeopardy, Attack-Defense, Mixed)
+   - Weight (CTFtime weight rating)
+   - Participants count
+   - Direct Link (clickable in supporting terminals)
 
-6. Save Option
-   -----------
-   You will be asked if you want to save all results to a JSON file.
-   Filename format: eventforge_<type>_<date>_<time>.json
+7. Statistics Dashboard
+   -------------------
+   After results, you'll see:
+   • Total CTFs found
+   • Online CTFs count
+   • Offline CTFs count
+   • High weight CTFs count
+   • Average participants
+
+8. Export Options
+   -------------
+   • Save to JSON (recommended) - Full event data
+   • Save to CSV - Spreadsheet-friendly format
+   Filename format: ctfforge_<date>_<time>.json/.csv
+
+9. Detailed Event View
+   -------------------
+   Option to view complete details of any event including:
+   • Full description
+   • Organizer information
+   • Prize details
+   • Status
+   • Clickable link
 
 TIPS & BEST PRACTICES
 
-• Always choose "All Events" first time to see everything available.
+• Always choose "All CTF Events" first time to see everything available.
 • Use multi-state selection if you are open to travel.
 • Online events are automatically included regardless of state.
-• Copy the link from the table and open it in your browser to register.
-• Run the tool frequently as new events are added daily.
+• Click the link directly in the terminal (Ctrl+Click on most terminals).
+• Use "High Weight" filter to find prestigious CTFs.
+• Run the tool frequently as new CTFs are added daily.
+• Export to CSV for sharing with your CTF team.
+• Use "Ongoing" filter to find CTFs happening right now.
+
+UNDERSTANDING CTF WEIGHT
+
+• Weight 0-25: Beginner/Junior CTFs
+• Weight 25-50: Intermediate CTFs
+• Weight 50-75: Advanced CTFs
+• Weight 75-100: Top-tier International CTFs
+• Higher weight = More prestigious and challenging
+
+UNDERSTANDING AI RANKING
+
+The AI ranking considers:
+• Days until start (sooner = better)
+• Number of participants (popular = better)
+• Indian state presence (local = better)
+• Currently ongoing (active = better)
+• CTF weight (prestigious = better)
+• Prize availability (monetary = better)
+• Offline format (in-person = better)
 
 TROUBLESHOOTING
 
 • "Playwright not installed" → Run: playwright install chromium
+• "Module not found" → Run: pip install httpx playwright rich
 • Slow first run → Normal, Chromium is being downloaded
 • Scraping warnings → Normal, some sites change layout frequently
-• No events found → Try "All Events" + "all" states
+• No events found → Try "All CTF Events" + "all" states + no filters
+• Links not clickable → Use terminal that supports hyperlinks (Windows Terminal, iTerm2, etc.)
+• CTF Hunt errors → Normal, this source is sometimes unavailable
+
+SYSTEM REQUIREMENTS
+
+• Python 3.7 or higher
+• Internet connection
+• 500MB free disk space (for Chromium browser)
+• Terminal with hyperlink support (recommended)
+
+SUPPORTED TERMINALS (for clickable links)
+
+• Windows Terminal
+• iTerm2 (macOS)
+• GNOME Terminal
+• Konsole
+• Alacritty
+• VS Code integrated terminal
+• Any terminal with OSC 8 support
+
+COMMAND-LINE ARGUMENTS (Advanced)
+
+    python ctfforge.py --help
+    python ctfforge.py --version
+    python ctfforge.py --export json
+    python ctfforge.py --export csv
+
+FUTURE UPDATES
+
+• More CTF sources (CTFd, HackTheBox CTF, etc.)
+• Team formation features
+• Calendar integration (ICS export)
+• Email notifications for new CTFs
+• Historical CTF data
+• CTF writeup links
 
 SUPPORT
     This is an open-source tool. Feel free to improve the scrapers when sites change.
+    Report issues on GitHub: https://github.com/jadhavidhi06-sketch
 
 Last Updated: April 2026
 ================================================================================
