@@ -1,90 +1,99 @@
-# 🚀 EventForge CLI v2.0
+Here is a clean, comprehensive, and professional `README.md` tailored specifically to your [eventforge.py](https://github.com/jadhavidhi06-sketch/ctf-event-tool/blob/main/eventforge.py) script. It outlines the features, prerequisites, installation steps, and usage so anyone visiting your repository can easily understand and run your tool.
 
-**Live Coding • Hackathon • Developer • CTF Events Finder for India**
+You can copy and paste the markdown below directly into your file:
 
-Made by **VRJ**  
-GitHub: [jadhavidhi06-sketch](https://github.com/jadhavidhi06-sketch)  
-LinkedIn: [vidhi-jadhav](https://linkedin.com/in/vidhi-jadhav)
+markdown
+# 🔐 CTFForge CLI v3.0
 
-# 🚀 EventForge CLI
+An interactive, command-line CTF event aggregator heavily optimized and focused on the Indian cybersecurity ecosystem. `CTFForge CLI` concurrently scrapes upcoming and ongoing Capture The Flag competitions from multiple open intelligence platforms, filters them based on geographic location, and runs a custom scoring algorithm to rank the best events for you.
 
-**The ultimate terminal tool to discover Coding, Hackathon, Developer & CTF events across India.**
-
-Live scraping from **Devfolio + Unstop + CTFtime** with beautiful Rich UI, AI-powered ranking, multi-state selection, and JSON export.
-
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
-![No API Keys](https://img.shields.io/badge/API%20Keys-None-red)
+Developed by **[VRJ](https://github.com/jadhavidhi06-sketch)**.
 
 ---
 
-## ✨ Features
+## 🚀 Features
 
-- **Live Scraping**: Real-time data from Devfolio, Unstop & CTFtime
-- **AI Ranking**: Smart scoring based on date, participants, location & prestige
-- **Rich Terminal UI**: Beautiful tables, progress bars & panels (powered by Rich)
-- **State Selection**: Single or multi-state filter (All Indian states + UTs)
-- **Async Scraping**: 10x faster with concurrent requests
-- **Ongoing + Upcoming Events** only
-- **Full Event Details**: Title, dates, location, link, source, AI score
-- **Export**: Save results to JSON with one click
-- **Zero API Keys** required
+* **Multi-Source Aggregation:** Concurrently scrapes event data using the CTFtime API, live CTFtime HTML parsing (via Playwright), and the CTF Hunt API.
+* **Smart AI Ranking:** Automatically ranks events based on proximity to start date, participant weight, prize availability, and localized relevance.
+* **Geo-Targeted Filtering:** Easily filter offline/on-site events across 36 Indian States and Union Territories while ensuring online events remain visible.
+* **Beautiful Terminal UI:** Styled entirely with `rich` panels, progress bars, tables, and color-coded competition weights.
+* **Clickable Links:** Generates fully interactive terminal links to immediately open CTF landing pages right from your CLI shell.
+* **Data Export:** Seamlessly dump your filtered CTF matching matrix into clean, formatted `.json` or `.csv` files for external analysis.
 
 ---
 
-🚀 EventForge CLI
-Live Scraping • Devfolio + Unstop + CTFtime • AI Ranking
+## 🛠️ Prerequisites & Installation
 
-Choose event category:
-1. Coding Event
-2. Developer Event
-3. Hackathon Event
-4. CTF Event
-5. All Events
+Make sure you have **Python 3.8+** installed on your system. 
 
-
-🚀 Quick Start
-<img width="933" height="630" alt="image" src="https://github.com/user-attachments/assets/aaed4657-c302-4b2a-b63b-818bf2bb7c54" />
+1. **Clone the Repository:**
+   ```bash
+   git clone [https://github.com/jadhavidhi06-sketch/ctf-event-tool.git](https://github.com/jadhavidhi06-sketch/ctf-event-tool.git)
+   cd ctf-event-tool
 
 
-📋 How to Use
 
-Select event type (Coding / Developer / Hackathon / CTF / All)
-Choose single or multi-state selection
-Select desired Indian states
-Wait for live scraping (Devfolio + Unstop + CTFtime)
-View AI-ranked ongoing & upcoming events
-Save results to JSON file (optional)
+2. **Install Required Packages:**
+Install the structural dependencies using `requirements.txt`:
+```bash
+pip install -r requirements.txt
 
-
-🛠️ Tech Stack
-
-Python 3.10+
-rich – Beautiful terminal UI
-playwright – Reliable scraping of JS-heavy sites
-httpx – Async HTTP client for CTFtime
-asyncio – Concurrent scraping
+```
 
 
-📁 Project Structure
-texteventforge-cli/
-├── eventforge.py          # Main CLI tool
-├── requirements.txt
-├── README.md
-├── MANUAL.txt
-└── events_*.json          # Auto-generated output files
+*(Note: Essential dependencies include `httpx`, `playwright`, and `rich`)*
+3. **Install Playwright Chromium Browser:**
+The tool utilizes a headless browser instances to scrape supplementary details dynamically. Run the following setup command:
+```bash
+playwright install chromium
 
-⚠️ Important Notes
-
-First run may take 10–20 seconds while Playwright downloads Chromium
-Some sites are heavily JavaScript-rendered → Playwright is used for accuracy
-Dates shown are realistic approximations (actual registration links are always provided)
-Tool is designed for Indian users with state-wise filtering
+```
 
 
-🤝 Contributing
-Pull requests are welcome! Feel free to improve scrapers or add new platforms.
-📄 License
-MIT License - Free to use for personal and educational purposes.
 
-Made with ❤️ for Indian developers, hackers & CTF players
+---
+
+## 🖥️ Usage
+
+Fire up the interactive CLI by running the script directly:
+
+```bash
+python eventforge.py
+
+```
+
+### Interactive Steps:
+
+1. **State Selection:** Choose whether you want to filter for specific Indian states (supports choosing single states, comma-separated combinations, or typing `all`).
+2. **Event Filtering:** Filter down the parsed timeline:
+* `1` - All CTF Events
+* `2` - Only Upcoming CTF Events
+* `3` - Only Ongoing CTF Events
+* `4` - Only Offline CTF Events
+* `5` - Only High Weight CTF Events (>50)
+
+
+3. **Sorting Parameters:** Choose your viewport priority: **AI Ranked (Recommended)**, Start Date, Participants Count, or CTF Weight.
+4. **Inspect & Save:** Inspect detailed records directly in the terminal, then opt-in to instantly export data records to `.json` or `.csv`.
+
+---
+
+## 📊 AI Scoring Metrics
+
+The algorithm evaluates and assigns a score up to `200.0` points per event using these parameters:
+
+* **Base Value:** Begins at `100.0` points.
+* **Urgency:** Penalizes `-6` points for every day remaining until the launch window (incentivizes closer events).
+* **Location Boost:** Grants an immediate `+45` points if located in an Indian region and `+15` if it features an offline footprint.
+* **Activity & Incentives:** Scales exponentially based on active participant pools, rewards a `+20` booster for prize pools, and multipliers based on official CTFtime weight.
+
+---
+
+## 🤝 Connect
+
+* **GitHub:** [@jadhavidhi06-sketch](https://github.com/jadhavidhi06-sketch)
+* **LinkedIn:** [vidhi-jadhav](https://www.google.com/search?q=https://linkedin.com/in/vidhi-jadhav)
+
+Happy Hacking! 🎉
+
+m
