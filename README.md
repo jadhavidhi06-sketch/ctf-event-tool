@@ -44,14 +44,8 @@ Choose event category:
 
 
 🚀 Quick Start
-1. Clone the repository
-Bashgit clone https://github.com/yourusername/eventforge-cli.git
-cd eventforge-cli
-2. Install dependencies
-Bashpip install -r requirements.txt
-playwright install chromium
-3. Run the tool
-Bashpython eventforge.py
+<img width="933" height="630" alt="image" src="https://github.com/user-attachments/assets/aaed4657-c302-4b2a-b63b-818bf2bb7c54" />
+
 
 📋 How to Use
 
