@@ -1,8 +1,4 @@
-Here is a clean, comprehensive, and professional `README.md` tailored specifically to your [eventforge.py](https://github.com/jadhavidhi06-sketch/ctf-event-tool/blob/main/eventforge.py) script. It outlines the features, prerequisites, installation steps, and usage so anyone visiting your repository can easily understand and run your tool.
 
-You can copy and paste the markdown below directly into your file:
-
-markdown
 # 🔐 CTFForge CLI v3.0
 
 An interactive, command-line CTF event aggregator heavily optimized and focused on the Indian cybersecurity ecosystem. `CTFForge CLI` concurrently scrapes upcoming and ongoing Capture The Flag competitions from multiple open intelligence platforms, filters them based on geographic location, and runs a custom scoring algorithm to rank the best events for you.
