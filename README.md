@@ -92,4 +92,4 @@ The algorithm evaluates and assigns a score up to `200.0` points per event using
 
 Happy Hacking! 🎉
 
-m
+Made with Love For Indian CTF Players !!!!
